@@ -1,7 +1,7 @@
 {
-  "name": "carte-random",
+  "name": "minigiochi",
   "version": "1.0.0",
-  "description": "Webapp multiplayer: distribuisce una carta a caso a ogni giocatore",
+  "description": "Minigiochi da fare con gli amici: carte a caso e conta fiches per il poker",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

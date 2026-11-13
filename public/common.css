@@ -112,95 +112,12 @@ select, #custom-wrap { margin-bottom: 12px; }
   background: rgba(255, 255, 255, 0.18); border-radius: 999px; padding: 1px 9px; font-size: .8rem;
 }
 
-/* ---------- Carta ---------- */
-.card-area { display: flex; flex-direction: column; align-items: center; padding: 24px 0 4px; }
-.card-area p { margin: 14px 0 0; }
-.card-area #round-label { margin-top: 4px; }
-
-.playing-card {
-  width: min(58vw, 220px);
-  aspect-ratio: 5 / 7;
-  perspective: 1000px;
-  cursor: pointer;
-  outline: none;
-}
-.playing-card.empty { cursor: default; opacity: .55; }
-.card-inner {
-  position: relative; width: 100%; height: 100%;
-  transition: transform .6s cubic-bezier(.2, .8, .2, 1);
-  transform-style: preserve-3d;
-}
-.playing-card.flipped .card-inner { transform: rotateY(180deg); }
-.playing-card.deal-anim { animation: deal .5s ease-out; }
-@keyframes deal {
-  from { transform: translateY(-40px) rotate(-8deg) scale(.85); opacity: 0; }
-  to { transform: none; opacity: 1; }
-}
-.card-face {
-  position: absolute; inset: 0;
-  border-radius: 16px;
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
-}
-.card-back {
-  background:
-    repeating-linear-gradient(45deg, rgba(255,255,255,.12) 0 8px, transparent 8px 16px),
-    linear-gradient(135deg, #8e1b1b, #c62828);
-  border: 8px solid var(--card-bg);
-  display: grid; place-items: center;
-}
-.card-back span { font-size: 4rem; font-weight: 800; color: rgba(255, 255, 255, 0.85); }
-.card-front {
-  transform: rotateY(180deg);
-  background: var(--card-bg);
-  color: var(--black);
-}
-.playing-card:focus-visible .card-face { box-shadow: 0 0 0 3px var(--accent), 0 12px 30px rgba(0,0,0,.35); }
-
-.face { position: absolute; inset: 0; padding: 10px 12px; }
-.face .corner { position: absolute; display: flex; flex-direction: column; align-items: center; line-height: 1; font-weight: 700; }
-.face .corner .r { font-size: 1.6rem; }
-.face .corner .s { font-size: 1.2rem; }
-.face .corner.tl { top: 10px; left: 12px; }
-.face .corner.br { bottom: 10px; right: 12px; transform: rotate(180deg); }
-.face .big { position: absolute; inset: 0; display: grid; place-items: center; font-size: 5rem; }
-.face .label { position: absolute; left: 0; right: 0; bottom: 34px; text-align: center; font-size: .8rem; opacity: .75; }
-.face.red { color: var(--red); }
-.face.black { color: var(--black); }
-.face.gold { color: var(--gold); }
-.face.blue { color: var(--blue); }
-.face.green { color: var(--green); }
-.face.custom { display: grid; place-items: center; text-align: center; padding: 18px; }
-.face.custom .txt { font-size: 1.7rem; font-weight: 800; word-break: break-word; color: #3a2a6b; }
-.face.custom::before, .face.custom::after { content: "✦"; position: absolute; color: #7b61c9; font-size: 1.3rem; }
-.face.custom::before { top: 12px; left: 14px; }
-.face.custom::after { bottom: 12px; right: 14px; }
-
-/* ---------- Giocatori ---------- */
-.players { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.players li {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 12px; border-radius: 10px; background: rgba(0, 0, 0, 0.18);
-}
-.players .dot { width: 9px; height: 9px; border-radius: 50%; background: #9e9e9e; flex: none; }
-.players .dot.on { background: #69f0ae; box-shadow: 0 0 6px #69f0ae; }
-.players .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.players .tag { font-size: .75rem; color: var(--accent); margin-left: 6px; }
-.players .mini {
-  flex: none; min-width: 44px; padding: 4px 8px; border-radius: 6px; text-align: center;
-  font-weight: 700; font-size: .9rem; background: var(--card-bg); color: var(--black);
-}
-.players .mini.red { color: var(--red); }
-.players .mini.gold { color: var(--gold); }
-.players .mini.blue { color: var(--blue); }
-.players .mini.green { color: var(--green); }
-.players .mini.custom { color: #3a2a6b; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.players .mini.hidden { background: linear-gradient(135deg, #8e1b1b, #c62828); color: #fff; }
-
 .toast {
   position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
   background: #111; color: #fff; padding: 10px 16px; border-radius: 10px;
   box-shadow: 0 6px 20px rgba(0,0,0,.4); font-size: .9rem; max-width: calc(100% - 32px);
 }
+
+.back { display: inline-block; color: var(--muted); text-decoration: none; font-size: .9rem; padding: 4px 0; }
+.back:hover { color: var(--text); }

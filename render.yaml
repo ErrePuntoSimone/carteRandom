@@ -4,7 +4,7 @@ services:
     name: carte-random
     runtime: node
     plan: free
-    branch: claude/admiring-cray-7lp2hn
+    branch: main
     buildCommand: "true"
     startCommand: npm start
     healthCheckPath: /healthz
