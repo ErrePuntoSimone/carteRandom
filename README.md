@@ -1,7 +1,8 @@
 # Minigiochi 🎲
 
 Raccolta di minigiochi da usare con gli amici, pensata per lo smartphone.
-La pagina iniziale è un menu da cui si sceglie il gioco.
+La pagina iniziale chiede il tuo nome (una volta sola, resta salvato sul dispositivo) e poi mostra il menu da cui si sceglie il gioco.
+Il nome si cambia dalla home o dal link "Cambia nome" dentro ai giochi.
 
 | Gioco | Percorso | Descrizione |
 |---|---|---|
@@ -9,6 +10,8 @@ La pagina iniziale è un menu da cui si sceglie il gioco.
 | 🪙 **Conta fiches** | `/fiches/` | Conta le fiches di ogni giocatore a poker e calcola chi paga chi |
 
 ## Carte Random
+
+Se apri il link di una stanza senza aver inserito il nome, passi prima dalla home e poi torni alla stanza.
 
 1. Una persona crea una stanza e riceve un codice di 5 caratteri (o un link da condividere).
 2. Gli amici entrano dal proprio telefono con il codice o il link.
@@ -50,6 +53,7 @@ lib/http.js            utility HTTP condivise
 games/carte/           logica lato server di Carte Random (stanze, mazzi)
 public/index.html      menu dei minigiochi
 public/common.css      stile condiviso
+public/common.js       nome del giocatore ("login") condiviso tra i giochi
 public/carte/          interfaccia di Carte Random
 public/fiches/         Conta fiches (solo lato browser)
 test/                  test automatici

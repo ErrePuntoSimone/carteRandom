@@ -22,6 +22,7 @@
     .game h2 { margin: 0 0 4px; }
     .game p { margin: 0; color: var(--muted); font-size: .92rem; }
     .game .go { margin-left: auto; color: var(--accent); font-size: 1.4rem; flex: none; }
+    .who strong { font-size: 1.1rem; }
     .tag-mp { font-size: .72rem; font-weight: 600; color: var(--accent-text); background: var(--accent); padding: 1px 7px; border-radius: 999px; }
   </style>
 </head>
@@ -30,10 +31,25 @@
     <header class="hero">
       <div class="logo">🎲</div>
       <h1>Minigiochi</h1>
-      <p class="sub">Scegli a cosa giocare.</p>
+      <p class="sub" id="hero-sub">Scegli a cosa giocare.</p>
     </header>
 
-    <nav class="games" aria-label="Minigiochi">
+    <!-- LOGIN -->
+    <form id="form-login" class="panel" autocomplete="off" hidden>
+      <label for="input-name">Come ti chiami?</label>
+      <div class="row">
+        <input id="input-name" maxlength="24" placeholder="Es. Giulia" required>
+        <button class="btn primary" type="submit">Entra</button>
+      </div>
+      <p class="muted small">Il nome viene usato in tutti i minigiochi e resta salvato su questo dispositivo.</p>
+    </form>
+
+    <div id="who" class="panel who" hidden>
+      <span>Ciao, <strong id="who-name"></strong> 👋</span>
+      <button id="btn-change" class="linkish" type="button">Cambia nome</button>
+    </div>
+
+    <nav class="games" id="games" aria-label="Minigiochi" hidden>
       <a class="game" href="/carte/">
         <span class="icon">🃏</span>
         <div>
@@ -52,5 +68,38 @@
       </a>
     </nav>
   </main>
+  <script src="/common.js"></script>
+  <script>
+    (() => {
+      const $ = (id) => document.getElementById(id);
+      const params = new URLSearchParams(location.search);
+      // solo percorsi interni, per sicurezza
+      const next = /^\/[^/\\]/.test(params.get('next') || '') ? params.get('next') : null;
+
+      function render(editing) {
+        const name = Player.getName();
+        const logged = !!name && !editing;
+        $('form-login').hidden = logged;
+        $('who').hidden = !logged;
+        $('games').hidden = !logged;
+        $('hero-sub').textContent = logged ? 'Scegli a cosa giocare.' : 'Inserisci il tuo nome per iniziare.';
+        if (logged) $('who-name').textContent = name;
+        else { $('input-name').value = name; $('input-name').focus(); $('input-name').select(); }
+      }
+
+      $('form-login').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const name = Player.clean($('input-name').value);
+        if (!name) return $('input-name').focus();
+        Player.setName(name);
+        if (next) return location.replace(next);
+        history.replaceState(null, '', '/');
+        render(false);
+      });
+      $('btn-change').addEventListener('click', () => render(true));
+
+      render(params.has('cambia'));
+    })();
+  </script>
 </body>
 </html>
