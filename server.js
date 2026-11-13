@@ -304,6 +304,7 @@ async function handleApi(req, res, url) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
+    if (url.pathname === '/healthz') return sendJson(res, 200, { ok: true, rooms: rooms.size });
     if (url.pathname.startsWith('/api/')) return await handleApi(req, res, url);
     if (req.method !== 'GET' && req.method !== 'HEAD') return sendJson(res, 405, { error: 'Metodo non consentito.' });
     serveStatic(req, res, url.pathname);
@@ -324,7 +325,7 @@ setInterval(() => {
 }, 60 * 1000).unref();
 
 if (require.main === module) {
-  server.listen(PORT, () => console.log(`Carte Random in ascolto su http://localhost:${PORT}`));
+  server.listen(PORT, '0.0.0.0', () => console.log(`Carte Random in ascolto su http://localhost:${PORT}`));
 }
 
 module.exports = { server, rooms };

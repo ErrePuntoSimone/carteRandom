@@ -35,3 +35,9 @@ Per giocare con altri sulla stessa rete Wi‑Fi, aprite `http://<IP-del-computer
 - `public/` — interfaccia (HTML/CSS/JS senza framework), ottimizzata per smartphone. Ricaricando la pagina si rientra automaticamente nella stanza.
 
 Le stanze sono in memoria: si perdono al riavvio del server e vengono eliminate dopo 6 ore di inattività.
+
+## Pubblicazione su Render
+
+Il repository contiene `render.yaml`: su render.com scegli **New → Blueprint**, seleziona il repository e conferma.
+In alternativa, **New → Web Service** con *Start Command* `npm start` e *Health Check Path* `/healthz`.
+Il piano gratuito mette l'app in pausa dopo un po' di inattività (il primo caricamento è lento) e le stanze in memoria si perdono al riavvio.

@@ -1,0 +1,13 @@
+# Blueprint di Render: basta collegare il repository (New -> Blueprint).
+services:
+  - type: web
+    name: carte-random
+    runtime: node
+    plan: free
+    branch: claude/admiring-cray-7lp2hn
+    buildCommand: "true"
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: "22"

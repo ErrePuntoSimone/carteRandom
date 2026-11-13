@@ -80,3 +80,9 @@ test('stanza inesistente', async () => {
   const r = await post('/api/rooms/ZZZZZ/join', { name: 'X' });
   assert.strictEqual(r.status, 404);
 });
+
+test('healthcheck', async () => {
+  const res = await fetch(base + '/healthz');
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual((await res.json()).ok, true);
+});
