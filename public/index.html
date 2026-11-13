@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f5132">
+  <title>Carte Random</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main id="app">
+    <!-- HOME -->
+    <section id="screen-home" class="screen" hidden>
+      <header class="hero">
+        <div class="logo">🃏</div>
+        <h1>Carte Random</h1>
+        <p class="sub">Crea una stanza, invita gli amici e dai una carta a caso a ognuno.</p>
+      </header>
+
+      <form id="form-name" class="panel" autocomplete="off">
+        <label for="input-name">Il tuo nome</label>
+        <input id="input-name" maxlength="24" placeholder="Es. Giulia" required>
+      </form>
+
+      <div class="panel">
+        <button id="btn-create" class="btn primary block">Crea una nuova stanza</button>
+      </div>
+
+      <form id="form-join" class="panel" autocomplete="off">
+        <label for="input-code">Hai un codice?</label>
+        <div class="row">
+          <input id="input-code" maxlength="5" placeholder="ABCDE" class="code-input" autocapitalize="characters" spellcheck="false">
+          <button class="btn" type="submit">Entra</button>
+        </div>
+      </form>
+      <p id="home-error" class="error" role="alert"></p>
+    </section>
+
+    <!-- ROOM -->
+    <section id="screen-room" class="screen" hidden>
+      <header class="room-head">
+        <div>
+          <span class="muted small">Stanza</span>
+          <div class="room-code" id="room-code">-----</div>
+        </div>
+        <div class="head-actions">
+          <button id="btn-share" class="btn small">Invita</button>
+          <button id="btn-leave" class="btn small ghost">Esci</button>
+        </div>
+      </header>
+
+      <div id="conn-banner" class="banner" hidden>Riconnessione…</div>
+
+      <div class="card-area">
+        <div id="my-card" class="playing-card empty" tabindex="0" role="button" aria-label="La tua carta">
+          <div class="card-inner">
+            <div class="card-face card-back"><span>?</span></div>
+            <div class="card-face card-front" id="my-card-front"></div>
+          </div>
+        </div>
+        <p id="card-hint" class="muted center">In attesa che venga distribuita una carta…</p>
+        <p id="round-label" class="muted small center"></p>
+      </div>
+
+      <div id="host-panel" class="panel" hidden>
+        <h2>Controlli</h2>
+        <label for="select-deck">Mazzo</label>
+        <select id="select-deck"></select>
+        <div id="custom-wrap" hidden>
+          <label for="custom-cards">Carte (una per riga, puoi ripeterle)</label>
+          <textarea id="custom-cards" rows="5" placeholder="Lupo&#10;Lupo&#10;Veggente&#10;Contadino&#10;Contadino"></textarea>
+          <p class="muted small" id="custom-count"></p>
+        </div>
+        <button id="btn-deal" class="btn primary block">🎲 Distribuisci le carte</button>
+        <label class="toggle">
+          <input type="checkbox" id="toggle-reveal">
+          <span>Mostra tutte le carte a tutti</span>
+        </label>
+        <p id="host-error" class="error" role="alert"></p>
+      </div>
+
+      <div class="panel">
+        <h2>Giocatori <span id="player-count" class="pill">0</span></h2>
+        <ul id="player-list" class="players"></ul>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/app.js"></script>
+</body>
+</html>
