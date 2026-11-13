@@ -28,6 +28,8 @@ Le carte vengono estratte senza ripetizioni, quindi servono almeno tante carte q
 
 Texas Hold'em no-limit con le carte vere: l'app fa da "banco" e tiene i conti.
 Ognuno si siede al tavolo dal proprio telefono con il codice o il link.
+I giocatori sono disegnati intorno a un tavolo da poker (tu sei sempre in basso, gli altri in ordine di gioco),
+con il piatto, le carte comuni da girare, le puntate davanti a ognuno e il bottone del dealer.
 
 - **Dealer e bui:** il bottone gira da solo a ogni mano, i bui vengono messi in automatico
   (in due giocatori il dealer mette il piccolo buio, come da regolamento).

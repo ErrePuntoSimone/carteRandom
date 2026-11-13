@@ -152,7 +152,6 @@
       }
     }
     $('status-street').textContent = street;
-    $('status-pot').textContent = n(pot);
     $('status-msg').innerHTML = msg;
   }
 
@@ -164,6 +163,9 @@
     $('btn-manage').hidden = !(isHost() && !inHand());
     $('btn-manage').textContent = managing ? 'Fatto' : 'Gestisci';
     const online = Object.fromEntries(S.members.map((m) => [m.id, m.online]));
+    $('seats').hidden = !managing;
+    $('ptable').hidden = managing;
+    if (!managing) return renderTable(t, online);
 
     $('seats').innerHTML = t.seats.map((s, i) => {
       const hp = showHand ? h.players[s.id] : null;
@@ -205,6 +207,97 @@
         ${bet}
       </li>`;
     }).join('');
+  }
+
+  // ---------- tavolo da poker ----------
+  const initials = (name) => name.split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
+  const hue = (str) => [...str].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+
+  function renderTable(t, online) {
+    const h = t.hand;
+    const showHand = h && inHand();
+    const over = t.phase === 'over' && h;
+    const dealerId = h && (showHand || over) ? h.dealerId : t.dealerId;
+    const seats = t.seats;
+    const count = seats.length;
+    // chi guarda è sempre in basso; gli altri seguono l'ordine di gioco in senso orario
+    const meIdx = Math.max(0, seats.findIndex((s) => s.id === S.you));
+    const won = {};
+    if (over && t.lastResult) for (const r of t.lastResult) won[r.id] = r.amount;
+    const eligible = new Set();
+    if (t.phase === 'showdown' && h.pots) for (const p of h.pots) if (!p.winners) p.eligible.forEach((id) => eligible.add(id));
+
+    // posizioni su un'ellisse: x/y in percentuale del tavolo
+    const pos = (i, f) => {
+      const a = Math.PI / 2 + ((i - meIdx + count) % count) * (2 * Math.PI / count);
+      return { x: 50 + Math.cos(a) * 41 * f, y: 50 + Math.sin(a) * 43 * f, a };
+    };
+
+    let html = '<div class="felt"><div class="felt-inner"></div></div>';
+
+    // centro: fase, piatto e carte comuni da girare
+    let street = 'In attesa', pot = 0, revealed = 0;
+    if (h && (showHand || over)) {
+      pot = over && h.pots ? h.pots.reduce((s, p) => s + p.amount, 0) : h.pot;
+      revealed = [0, 3, 4, 5][h.street];
+      street = t.phase === 'showdown' ? 'Showdown' : over ? 'Mano finita' : h.streetName;
+    }
+    const slots = Array.from({ length: 5 }, (_, i) => `<span class="slot ${i < revealed ? 'on' : ''}"></span>`).join('');
+    html += `<div class="center">
+      <div class="c-street">${esc(street)}</div>
+      <div class="c-cards" aria-label="${revealed} carte comuni sul tavolo">${slots}</div>
+      <div class="c-pot"><span class="chipdot"></span>${n(pot)}</div>
+      ${h && showHand && h.pots && h.pots.length > 1 ? `<div class="c-side">${h.pots.length - 1} piatt${h.pots.length > 2 ? 'i' : 'o'} laterali</div>` : ''}
+    </div>`;
+
+    seats.forEach((s, i) => {
+      const hp = (showHand || over) && h ? h.players[s.id] : null;
+      const p = pos(i, 1);
+      const cls = ['pseat'];
+      if (showHand && h.toAct === s.id) cls.push('turn');
+      if (hp && hp.folded) cls.push('folded');
+      if ((showHand && !hp) || (!showHand && !over && (s.sittingOut || !s.stack))) cls.push('out');
+      if (s.id === S.you) cls.push('me');
+      if (eligible.has(s.id)) cls.push('contender');
+      if (won[s.id]) cls.push('winner');
+      if (p.y < 50) cls.push('top');
+
+      let tag = '';
+      if (won[s.id]) tag = `<span class="ptag win">+${n(won[s.id])}</span>`;
+      else if (hp && hp.allIn) tag = '<span class="ptag allin">ALL-IN</span>';
+      else if (hp && hp.folded) tag = '<span class="ptag fold">FOLD</span>';
+      else if (showHand && h.toAct === s.id) tag = '<span class="ptag turn">di turno</span>';
+      else if (showHand && !hp) tag = '<span class="ptag">fuori</span>';
+      else if (s.sittingOut) tag = '<span class="ptag">salta</span>';
+      else if (!online[s.id]) tag = '<span class="ptag">offline</span>';
+
+      const blind = showHand && s.id === h.sbId ? '<span class="pblind sb">SB</span>'
+        : showHand && s.id === h.bbId ? '<span class="pblind bb">BB</span>' : '';
+      html += `<div class="${cls.join(' ')}" style="left:${p.x}%;top:${p.y}%" data-id="${s.id}">
+        <div class="avatar" style="--h:${hue(s.name)}">${esc(initials(s.name))}${s.id === S.hostId ? '<span class="crown" title="Host">👑</span>' : ''}
+          <span class="odot ${online[s.id] ? 'on' : ''}"></span></div>
+        <div class="plate">
+          <div class="pname">${esc(s.name)}${s.id === S.you ? ' <span class="you">(tu)</span>' : ''}</div>
+          <div class="pstack">${n(s.stack)}${blind}</div>
+        </div>
+        ${tag}
+      </div>`;
+
+      // puntata davanti al giocatore
+      if (hp && hp.bet > 0 && t.phase === 'betting') {
+        const b = pos(i, 0.56);
+        html += `<div class="pbet" style="left:${b.x}%;top:${b.y}%"><span class="chipdot"></span>${n(hp.bet)}</div>`;
+      }
+      // bottone del dealer sul panno, leggermente di lato
+      if (s.id === dealerId) {
+        const a = p.a + (count > 2 ? 0.32 : 0.5);
+        html += `<div class="dbutton" style="left:${50 + Math.cos(a) * 41 * 0.7}%;top:${50 + Math.sin(a) * 43 * 0.7}%" title="Dealer">D</div>`;
+      }
+    });
+
+    if (!count) html += '<p class="muted center empty">Nessun giocatore</p>';
+    $('ptable').innerHTML = html;
+    $('ptable').dataset.count = count;
   }
 
   function renderShowdown(t) {

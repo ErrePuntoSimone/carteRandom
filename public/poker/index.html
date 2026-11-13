@@ -60,15 +60,15 @@
           <span id="status-street" class="street"></span>
           <span id="status-blinds" class="muted small"></span>
         </div>
-        <div class="pot-line"><span class="muted small">Piatto</span> <span id="status-pot" class="pot">0</span></div>
         <p id="status-msg" class="status-msg"></p>
       </div>
 
       <!-- posti al tavolo -->
-      <div class="panel">
+      <div class="panel table-panel">
         <h2>Tavolo <span id="seat-count" class="pill">0</span>
           <button id="btn-manage" class="linkish small right" type="button" hidden>Gestisci</button></h2>
-        <ul id="seats" class="seats"></ul>
+        <div id="ptable" class="ptable" aria-label="Tavolo da poker"></div>
+        <ul id="seats" class="seats" hidden></ul>
       </div>
 
       <!-- showdown -->

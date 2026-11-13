@@ -113,3 +113,119 @@ details.panel[open] > summary { margin-bottom: 12px; }
 .raise-row input[type=number] { width: 96px; text-align: center; font-weight: 700; }
 .action-bar .toast { bottom: 100%; }
 .toast { top: calc(12px + env(safe-area-inset-top)); bottom: auto; z-index: 30; }
+
+/* ---------- tavolo da poker ---------- */
+.table-panel { padding: 12px 8px; }
+.table-panel h2 { padding: 0 8px; }
+.ptable {
+  position: relative; width: 100%;
+  aspect-ratio: 4 / 5; max-height: 70vh;
+  margin: 4px auto 0;
+  --seat-w: 82px;
+}
+.ptable[data-count="9"], .ptable[data-count="10"], .ptable[data-count="11"], .ptable[data-count="12"] { --seat-w: 70px; }
+.felt {
+  position: absolute; inset: 9% 13%;
+  border-radius: 50% / 50%;
+  background: linear-gradient(160deg, #6d4c2f, #3e2716);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, .45), inset 0 2px 3px rgba(255, 255, 255, .25);
+  padding: 4.5%;
+}
+.felt-inner {
+  width: 100%; height: 100%; border-radius: 50% / 50%;
+  background: radial-gradient(ellipse at 50% 40%, #2fa36b 0%, #19804e 45%, #0f5f39 100%);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .12), inset 0 0 40px rgba(0, 0, 0, .45);
+}
+.center {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  text-align: center; pointer-events: none; width: 48%;
+}
+.c-street { font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: rgba(255,255,255,.8); }
+.c-cards { display: flex; justify-content: center; gap: 4px; margin: 8px 0; }
+.slot {
+  width: 20px; height: 29px; border-radius: 4px;
+  border: 1.5px dashed rgba(255, 255, 255, .35);
+  transition: background .3s, border-color .3s, transform .3s;
+}
+.slot.on {
+  border: 1.5px solid #fff;
+  background: repeating-linear-gradient(45deg, rgba(255,255,255,.18) 0 3px, transparent 3px 6px), linear-gradient(135deg, #8e1b1b, #c62828);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, .4);
+}
+.c-pot {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 1.35rem; font-weight: 800;
+  background: rgba(0, 0, 0, .35); padding: 3px 12px; border-radius: 999px;
+}
+.c-side { font-size: .7rem; color: rgba(255,255,255,.75); margin-top: 4px; }
+.chipdot {
+  width: 13px; height: 13px; border-radius: 50%; flex: none; display: inline-block;
+  background: radial-gradient(circle, var(--accent) 0 40%, transparent 41%), repeating-conic-gradient(var(--accent) 0 30deg, #fff 30deg 45deg);
+  border: 1px solid rgba(0, 0, 0, .45);
+}
+
+.pseat {
+  position: absolute; transform: translate(-50%, -50%);
+  width: var(--seat-w); display: flex; flex-direction: column; align-items: center;
+  transition: opacity .25s, filter .25s; z-index: 2;
+}
+.pseat .avatar {
+  position: relative; width: 42px; height: 42px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 800; font-size: .95rem; color: #fff;
+  background: hsl(var(--h) 45% 38%);
+  border: 3px solid rgba(255, 255, 255, .85);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, .45);
+  transition: box-shadow .25s, border-color .25s;
+}
+.pseat .crown { position: absolute; top: -13px; font-size: .8rem; }
+.pseat .odot { position: absolute; right: -2px; bottom: -2px; width: 11px; height: 11px; border-radius: 50%; background: #9e9e9e; border: 2px solid #0a3a24; }
+.pseat .odot.on { background: #69f0ae; }
+.pseat .plate {
+  margin-top: -6px; width: 100%;
+  background: rgba(10, 25, 18, .92); border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 8px; padding: 6px 4px 3px; text-align: center; line-height: 1.15;
+}
+.pseat .pname { font-size: .74rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pseat .pname .you { font-weight: 500; color: var(--muted); font-size: .66rem; }
+.pseat .pstack { font-size: .78rem; font-weight: 800; color: var(--accent); display: flex; justify-content: center; align-items: center; gap: 3px; }
+.pblind { font-size: .58rem; font-weight: 800; padding: 0 4px; border-radius: 4px; line-height: 1.5; }
+.pblind.sb { background: #90caf9; color: #0d2b4a; }
+.pblind.bb { background: #1e88e5; color: #fff; }
+.ptag {
+  margin-top: 3px; font-size: .62rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+  padding: 1px 6px; border-radius: 999px; background: rgba(255,255,255,.18); white-space: nowrap;
+}
+.ptag.allin { background: var(--danger); color: #3b0000; }
+.ptag.fold { background: rgba(0,0,0,.5); color: var(--muted); }
+.ptag.turn { background: var(--accent); color: var(--accent-text); }
+.ptag.win { background: #69f0ae; color: #003b1f; font-size: .72rem; }
+
+.pseat.turn .avatar { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(245, 197, 66, .35), 0 0 18px rgba(245, 197, 66, .7); animation: pulse 1.4s ease-in-out infinite; }
+.pseat.turn .plate { border-color: var(--accent); }
+.pseat.me .plate { border-color: rgba(255, 255, 255, .45); }
+.pseat.folded { opacity: .45; filter: grayscale(.8); }
+.pseat.out { opacity: .35; filter: grayscale(1); }
+.pseat.contender .avatar { border-color: #fff; box-shadow: 0 0 0 4px rgba(255, 255, 255, .25); }
+.pseat.winner .avatar { border-color: #69f0ae; box-shadow: 0 0 0 4px rgba(105, 240, 174, .35), 0 0 18px rgba(105, 240, 174, .6); }
+@keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(245, 197, 66, .15), 0 0 24px rgba(245, 197, 66, .8); } }
+
+.pbet {
+  position: absolute; transform: translate(-50%, -50%); z-index: 1;
+  display: flex; align-items: center; gap: 4px;
+  background: rgba(0, 0, 0, .45); border-radius: 999px; padding: 2px 8px 2px 3px;
+  font-size: .78rem; font-weight: 800; white-space: nowrap;
+  animation: betin .25s ease-out;
+}
+@keyframes betin { from { opacity: 0; transform: translate(-50%, -50%) scale(.6); } }
+.dbutton {
+  position: absolute; transform: translate(-50%, -50%); z-index: 1;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; color: #111; font-weight: 900; font-size: .72rem;
+  display: grid; place-items: center; box-shadow: 0 2px 5px rgba(0, 0, 0, .5);
+  border: 2px solid #ddd; transition: left .5s, top .5s;
+}
+.ptable .empty { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); }
+
+@media (prefers-reduced-motion: reduce) {
+  .pseat.turn .avatar, .pbet { animation: none; }
+}
