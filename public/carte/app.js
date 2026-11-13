@@ -32,7 +32,7 @@
 
   // ---------- Navigazione ----------
   function codeFromUrl() {
-    const m = location.pathname.match(/^\/r\/([A-Za-z0-9]{5})\/?$/);
+    const m = location.pathname.match(/^\/carte\/r\/([A-Za-z0-9]{5})\/?$/);
     return m ? m[1].toUpperCase() : null;
   }
 
@@ -50,7 +50,7 @@
   function enterRoom(s) {
     session = s;
     store.set('session:' + s.code, s);
-    if (codeFromUrl() !== s.code) history.pushState(null, '', '/r/' + s.code);
+    if (codeFromUrl() !== s.code) history.pushState(null, '', '/carte/r/' + s.code);
     $('screen-home').hidden = true;
     $('screen-room').hidden = false;
     $('room-code').textContent = s.code;
@@ -62,7 +62,7 @@
   function openStream() {
     closeStream();
     const q = new URLSearchParams({ playerId: session.playerId, token: session.token });
-    es = new EventSource(`/api/rooms/${session.code}/events?${q}`);
+    es = new EventSource(`/api/carte/rooms/${session.code}/events?${q}`);
     es.addEventListener('state', (e) => {
       $('conn-banner').hidden = true;
       render(JSON.parse(e.data));
@@ -71,7 +71,7 @@
       const { reason } = JSON.parse(e.data);
       const code = session.code;
       store.del('session:' + code);
-      history.pushState(null, '', '/');
+      history.pushState(null, '', '/carte/');
       showHome('', reason);
     });
     es.onerror = () => {
@@ -86,14 +86,14 @@
     const s = session;
     if (!s) return;
     try {
-      await api(`/api/rooms/${s.code}/join`, s);
+      await api(`/api/carte/rooms/${s.code}/join`, s);
       if (session === s) setTimeout(() => session === s && openStream(), 1500);
     } catch (err) {
       if (session !== s) return;
       if (/non trovata|non riconosciuto|nome/i.test(err.message)) {
         closeStream();
         store.del('session:' + s.code);
-        history.pushState(null, '', '/');
+        history.pushState(null, '', '/carte/');
         showHome('', 'La stanza non esiste più.');
       } else {
         setTimeout(() => session === s && checkSession(), 3000);
@@ -224,7 +224,7 @@
   $('btn-create').addEventListener('click', async () => {
     const name = getName();
     if (!name) return;
-    try { enterRoom(await api('/api/rooms', { name })); }
+    try { enterRoom(await api('/api/carte/rooms', { name })); }
     catch (err) { $('home-error').textContent = err.message; }
   });
 
@@ -234,7 +234,7 @@
     if (code.length !== 5) { $('home-error').textContent = 'Il codice è di 5 caratteri.'; return; }
     const name = getName();
     if (!name) return;
-    try { enterRoom(await api(`/api/rooms/${code}/join`, { name })); }
+    try { enterRoom(await api(`/api/carte/rooms/${code}/join`, { name })); }
     catch (err) { $('home-error').textContent = err.message; }
   });
 
@@ -255,21 +255,21 @@
     btn.disabled = true;
     try {
       if (state.deckId === 'custom') await flushCustom();
-      await api(`/api/rooms/${session.code}/deal`, authBody());
+      await api(`/api/carte/rooms/${session.code}/deal`, authBody());
     } catch (err) { $('host-error').textContent = err.message; }
     finally { btn.disabled = false; }
   });
 
   $('select-deck').addEventListener('change', async (e) => {
     $('host-error').textContent = '';
-    try { await api(`/api/rooms/${session.code}/settings`, authBody({ deckId: e.target.value })); }
+    try { await api(`/api/carte/rooms/${session.code}/settings`, authBody({ deckId: e.target.value })); }
     catch (err) { $('host-error').textContent = err.message; }
   });
 
   async function flushCustom() {
     clearTimeout(customTimer);
     customTimer = null;
-    await api(`/api/rooms/${session.code}/settings`, authBody({ customCards: parseCustom() }));
+    await api(`/api/carte/rooms/${session.code}/settings`, authBody({ customCards: parseCustom() }));
   }
   $('custom-cards').addEventListener('input', () => {
     updateCustomCount();
@@ -278,7 +278,7 @@
   });
 
   $('toggle-reveal').addEventListener('change', async (e) => {
-    try { await api(`/api/rooms/${session.code}/reveal`, authBody({ revealed: e.target.checked })); }
+    try { await api(`/api/carte/rooms/${session.code}/reveal`, authBody({ revealed: e.target.checked })); }
     catch (err) { $('host-error').textContent = err.message; }
   });
 
@@ -287,12 +287,12 @@
     if (!id) return;
     const p = state.players.find((x) => x.id === id);
     if (!confirm(`Rimuovere ${p ? p.name : 'questo giocatore'} dalla stanza?`)) return;
-    try { await api(`/api/rooms/${session.code}/kick`, authBody({ targetId: id })); }
+    try { await api(`/api/carte/rooms/${session.code}/kick`, authBody({ targetId: id })); }
     catch (err) { toast(err.message); }
   });
 
   $('btn-share').addEventListener('click', async () => {
-    const url = `${location.origin}/r/${session.code}`;
+    const url = `${location.origin}/carte/r/${session.code}`;
     if (navigator.share) {
       try { await navigator.share({ title: 'Carte Random', text: `Entra nella stanza ${session.code}`, url }); return; }
       catch (err) { if (err.name === 'AbortError') return; }
@@ -306,8 +306,8 @@
     const s = session;
     closeStream();
     store.del('session:' + s.code);
-    api(`/api/rooms/${s.code}/leave`, { playerId: s.playerId, token: s.token }).catch(() => {});
-    history.pushState(null, '', '/');
+    api(`/api/carte/rooms/${s.code}/leave`, { playerId: s.playerId, token: s.token }).catch(() => {});
+    history.pushState(null, '', '/carte/');
     showHome();
   });
 
@@ -320,12 +320,12 @@
     if (session && session.code === code) return;
     const saved = store.get('session:' + code);
     if (saved) {
-      try { return enterRoom(await api(`/api/rooms/${code}/join`, saved)); }
+      try { return enterRoom(await api(`/api/carte/rooms/${code}/join`, saved)); }
       catch { store.del('session:' + code); }
     }
     showHome(code);
   }
 
-  fetch('/api/decks').then((r) => r.json()).then((d) => { decks = d; if (state) render(state); }).catch(() => {});
+  fetch('/api/carte/decks').then((r) => r.json()).then((d) => { decks = d; if (state) render(state); }).catch(() => {});
   route();
 })();

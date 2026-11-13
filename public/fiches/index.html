@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f5132">
+  <title>Conta fiches · Minigiochi</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪙</text></svg>">
+  <link rel="stylesheet" href="/common.css">
+  <link rel="stylesheet" href="/fiches/style.css">
+</head>
+<body>
+  <main id="app">
+    <a class="back" href="/">← Menu</a>
+    <header class="hero compact">
+      <div class="logo">🪙</div>
+      <h1>Conta fiches</h1>
+      <p class="sub">Inserisci quante fiches ha ogni giocatore: totali e conti si fanno da soli.</p>
+    </header>
+
+    <details class="panel" id="settings">
+      <summary><h2>Impostazioni</h2></summary>
+
+      <h3>Fiches</h3>
+      <ul id="chip-list" class="chip-list"></ul>
+      <button id="btn-add-chip" class="btn small">+ Aggiungi fiche</button>
+
+      <h3>Soldi</h3>
+      <div class="grid2">
+        <div>
+          <label for="buyin-money">Buy-in (€)</label>
+          <input id="buyin-money" type="number" inputmode="decimal" min="0" step="0.5">
+        </div>
+        <div>
+          <label for="buyin-chips">Fiches per buy-in</label>
+          <input id="buyin-chips" type="number" inputmode="numeric" min="0" step="1">
+        </div>
+      </div>
+      <p class="muted small" id="rate-label"></p>
+      <p class="muted small" id="stack-label"></p>
+    </details>
+
+    <section class="panel">
+      <h2>Giocatori <span id="player-count" class="pill">0</span></h2>
+      <form id="form-player" class="row" autocomplete="off">
+        <input id="input-player" maxlength="24" placeholder="Nome giocatore">
+        <button class="btn primary" type="submit">Aggiungi</button>
+      </form>
+      <div id="players" class="players-grid"></div>
+    </section>
+
+    <section class="panel" id="summary">
+      <h2>Riepilogo</h2>
+      <div id="summary-body"></div>
+    </section>
+
+    <section class="panel">
+      <h2>Chi paga chi</h2>
+      <div id="settle-body"></div>
+    </section>
+
+    <div class="center bottom-actions">
+      <button id="btn-reset-counts" class="btn small ghost">Azzera i conteggi</button>
+      <button id="btn-reset-all" class="btn small ghost">Ricomincia da capo</button>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/fiches/app.js"></script>
+</body>
+</html>
