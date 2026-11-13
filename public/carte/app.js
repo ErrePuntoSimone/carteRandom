@@ -43,8 +43,8 @@
     $('screen-home').hidden = false;
     if (prefillCode) $('input-code').value = prefillCode;
     $('home-error').textContent = error || '';
-    $('input-name').value = store.get('name') || '';
-    if (!$('input-name').value) $('input-name').focus();
+    $('who-name').textContent = Player.getName();
+    $('link-change').href = Player.loginUrl(true);
   }
 
   function enterRoom(s) {
@@ -213,13 +213,8 @@
 
   // ---------- Eventi UI ----------
   function getName() {
-    const name = $('input-name').value.trim();
-    if (!name) { $('home-error').textContent = 'Inserisci il tuo nome.'; $('input-name').focus(); return null; }
-    store.set('name', name);
-    return name;
+    return Player.require();
   }
-
-  $('form-name').addEventListener('submit', (e) => { e.preventDefault(); $('btn-create').click(); });
 
   $('btn-create').addEventListener('click', async () => {
     const name = getName();
@@ -326,6 +321,7 @@
     showHome(code);
   }
 
-  fetch('/api/carte/decks').then((r) => r.json()).then((d) => { decks = d; if (state) render(state); }).catch(() => {});
+  if (!Player.require()) return; // senza nome si passa dalla home
+    fetch('/api/carte/decks').then((r) => r.json()).then((d) => { decks = d; if (state) render(state); }).catch(() => {});
   route();
 })();

@@ -20,10 +20,10 @@
         <p class="sub">Crea una stanza, invita gli amici e dai una carta a caso a ognuno.</p>
       </header>
 
-      <form id="form-name" class="panel" autocomplete="off">
-        <label for="input-name">Il tuo nome</label>
-        <input id="input-name" maxlength="24" placeholder="Es. Giulia" required>
-      </form>
+      <div class="panel who">
+        <span>Giochi come <strong id="who-name"></strong></span>
+        <a id="link-change" class="linkish" href="/">Cambia nome</a>
+      </div>
 
       <div class="panel">
         <button id="btn-create" class="btn primary block">Crea una nuova stanza</button>
@@ -90,6 +90,7 @@
   </main>
 
   <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/common.js"></script>
   <script src="/carte/app.js"></script>
 </body>
 </html>

@@ -121,3 +121,6 @@ select, #custom-wrap { margin-bottom: 12px; }
 
 .back { display: inline-block; color: var(--muted); text-decoration: none; font-size: .9rem; padding: 4px 0; }
 .back:hover { color: var(--text); }
+
+.who { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.linkish { background: none; border: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; padding: 4px 0; text-decoration: none; }

@@ -28,6 +28,7 @@ test('pagine dei minigiochi', async () => {
     assert.strictEqual((await get(`/${g}/style.css`)).status, 200);
   }
   assert.strictEqual((await get('/common.css')).status, 200);
+  assert.strictEqual((await get('/common.js')).status, 200);
 });
 
 test('redirect alla cartella e link alle stanze', async () => {
