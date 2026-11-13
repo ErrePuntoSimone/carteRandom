@@ -17,10 +17,11 @@ test('il menu elenca i minigiochi', async () => {
   assert.strictEqual(r.status, 200);
   assert.match(r.text, /href="\/carte\/"/);
   assert.match(r.text, /href="\/fiches\/"/);
+  assert.match(r.text, /href="\/poker\/"/);
 });
 
 test('pagine dei minigiochi', async () => {
-  for (const g of ['carte', 'fiches']) {
+  for (const g of ['carte', 'fiches', 'poker']) {
     const r = await get(`/${g}/`);
     assert.strictEqual(r.status, 200, g);
     assert.match(r.type, /text\/html/);
