@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const { sendJson } = require('./lib/http');
 const carte = require('./games/carte/server');
+const poker = require('./games/poker/server');
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -13,6 +14,7 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 // Minigiochi con API lato server: /api/<nome>/...
 const API = {
   carte: carte.handleApi,
+  poker: poker.handleApi,
 };
 
 const MIME = {
@@ -60,7 +62,7 @@ function serveStatic(res, pathname) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
-    if (url.pathname === '/healthz') return sendJson(res, 200, { ok: true, rooms: carte.rooms.size });
+    if (url.pathname === '/healthz') return sendJson(res, 200, { ok: true, rooms: carte.rooms.size + poker.rooms.size });
     if (url.pathname.startsWith('/api/')) {
       const [, game, ...parts] = url.pathname.split('/').filter(Boolean);
       const handler = API[game];

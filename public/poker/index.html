@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f5132">
+  <title>Poker · Minigiochi</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♠️</text></svg>">
+  <link rel="stylesheet" href="/common.css">
+  <link rel="stylesheet" href="/poker/style.css">
+</head>
+<body>
+  <main id="app">
+    <!-- HOME -->
+    <section id="screen-home" class="screen" hidden>
+      <a class="back" href="/">← Menu</a>
+      <header class="hero">
+        <div class="logo">♠️</div>
+        <h1>Poker</h1>
+        <p class="sub">Le carte sono quelle vere: qui si gestiscono turni, bui, puntate e fiches.</p>
+      </header>
+
+      <div class="panel who">
+        <span>Giochi come <strong id="who-name"></strong></span>
+        <a id="link-change" class="linkish" href="/">Cambia nome</a>
+      </div>
+
+      <div class="panel">
+        <button id="btn-create" class="btn primary block">Crea un tavolo</button>
+      </div>
+
+      <form id="form-join" class="panel" autocomplete="off">
+        <label for="input-code">Hai un codice?</label>
+        <div class="row">
+          <input id="input-code" maxlength="5" placeholder="ABCDE" class="code-input" autocapitalize="characters" spellcheck="false">
+          <button class="btn" type="submit">Entra</button>
+        </div>
+      </form>
+      <p id="home-error" class="error" role="alert"></p>
+    </section>
+
+    <!-- TAVOLO -->
+    <section id="screen-room" class="screen" hidden>
+      <header class="room-head">
+        <div>
+          <span class="muted small">Tavolo</span>
+          <div class="room-code" id="room-code">-----</div>
+        </div>
+        <div class="head-actions">
+          <button id="btn-share" class="btn small">Invita</button>
+          <button id="btn-leave" class="btn small ghost">Esci</button>
+        </div>
+      </header>
+
+      <div id="conn-banner" class="banner" hidden>Riconnessione…</div>
+
+      <!-- stato della mano -->
+      <div id="status" class="status panel">
+        <div class="status-top">
+          <span id="status-street" class="street"></span>
+          <span id="status-blinds" class="muted small"></span>
+        </div>
+        <div class="pot-line"><span class="muted small">Piatto</span> <span id="status-pot" class="pot">0</span></div>
+        <p id="status-msg" class="status-msg"></p>
+      </div>
+
+      <!-- posti al tavolo -->
+      <div class="panel">
+        <h2>Tavolo <span id="seat-count" class="pill">0</span>
+          <button id="btn-manage" class="linkish small right" type="button" hidden>Gestisci</button></h2>
+        <ul id="seats" class="seats"></ul>
+      </div>
+
+      <!-- showdown -->
+      <div id="showdown" class="panel" hidden>
+        <h2>Showdown</h2>
+        <div id="pots"></div>
+      </div>
+
+      <!-- fine mano -->
+      <div id="result" class="panel" hidden>
+        <h2>Fine mano</h2>
+        <ul id="result-list" class="result-list"></ul>
+      </div>
+
+      <!-- controlli di chi gestisce il tavolo -->
+      <div id="manager-panel" class="panel" hidden>
+        <button id="btn-start" class="btn primary block">Inizia la mano</button>
+        <p id="start-hint" class="muted small center"></p>
+      </div>
+
+      <details id="settings" class="panel" hidden>
+        <summary><h2>Impostazioni</h2></summary>
+        <form id="form-settings" autocomplete="off">
+          <div class="grid3">
+            <div><label for="set-stack">Fiches iniziali</label><input id="set-stack" type="number" inputmode="numeric" min="1"></div>
+            <div><label for="set-sb">Piccolo buio</label><input id="set-sb" type="number" inputmode="numeric" min="1"></div>
+            <div><label for="set-bb">Grande buio</label><input id="set-bb" type="number" inputmode="numeric" min="1"></div>
+          </div>
+          <button class="btn block" type="submit">Salva</button>
+          <p class="muted small">I bui nuovi valgono dalla mano successiva. Le fiches iniziali valgono per chi entra o ricarica.</p>
+        </form>
+      </details>
+
+      <div class="panel me-panel" id="me-panel">
+        <label class="toggle"><input type="checkbox" id="toggle-sitout"><span>Salta le prossime mani</span></label>
+        <button id="btn-rebuy" class="btn small" hidden>Ricarica fiches</button>
+      </div>
+
+      <details class="panel" id="log-panel">
+        <summary><h2>Cronologia</h2></summary>
+        <ol id="log" class="log"></ol>
+      </details>
+
+      <p id="room-error" class="error center" role="alert"></p>
+      <div class="action-spacer"></div>
+    </section>
+  </main>
+
+  <!-- barra delle azioni (fissa in basso) -->
+  <div id="action-bar" class="action-bar" hidden>
+    <div class="action-inner">
+      <div id="action-who" class="action-who"></div>
+      <div id="raise-box" class="raise-box" hidden>
+        <div class="presets" id="presets"></div>
+        <div class="raise-row">
+          <input id="raise-range" type="range" step="1">
+          <input id="raise-input" type="number" inputmode="numeric" step="1" aria-label="Importo">
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btn-fold" class="btn act fold">Fold</button>
+        <button id="btn-call" class="btn act call">Check</button>
+        <button id="btn-raise" class="btn act raise primary">Punta</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="wait-bar" class="action-bar wait" hidden>
+    <div class="action-inner">
+      <span id="wait-text"></span>
+      <button id="btn-act-for" class="btn small" hidden></button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/common.js"></script>
+  <script src="/poker/app.js"></script>
+</body>
+</html>
