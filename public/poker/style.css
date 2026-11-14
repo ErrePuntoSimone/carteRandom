@@ -230,19 +230,8 @@ details.panel[open] > summary { margin-bottom: 12px; }
   .pseat.turn .avatar, .pbet { animation: none; }
 }
 
-/* sedie libere (cambio posto) */
-.pchair {
-  position: absolute; transform: translate(-50%, -50%); z-index: 2;
-  width: 54px; height: 54px; border-radius: 50%;
-  border: 2px dashed rgba(255, 255, 255, .45); background: rgba(0, 0, 0, .25);
-  color: rgba(255, 255, 255, .85); font: inherit; cursor: pointer;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1;
-  transition: background .2s, border-color .2s, transform .15s;
+.seat-hint {
+  margin: 8px 8px 0; display: flex; flex-direction: column; align-items: center; gap: 8px;
 }
-.pchair span { font-size: 1.3rem; font-weight: 700; }
-.pchair small { font-size: .58rem; text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
-.pchair:hover:not(:disabled) { border-color: var(--accent); background: rgba(245, 197, 66, .18); color: var(--accent); }
-.pchair:active:not(:disabled) { transform: translate(-50%, -50%) scale(.94); }
-.pchair:disabled { cursor: default; opacity: .5; }
-.seat-hint { margin: 6px 0 0; }
-.seat-hint .linkish { font-size: .9rem; }
+.seat-hint strong { color: var(--text); }
+.seat-move { display: flex; gap: 8px; }
