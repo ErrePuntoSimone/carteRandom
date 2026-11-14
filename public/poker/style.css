@@ -136,7 +136,7 @@ details.panel[open] > summary { margin-bottom: 12px; }
   background: radial-gradient(ellipse at 50% 40%, #2fa36b 0%, #19804e 45%, #0f5f39 100%);
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .12), inset 0 0 40px rgba(0, 0, 0, .45);
 }
-.center {
+.tcenter {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
   text-align: center; pointer-events: none; width: 48%;
 }
@@ -229,3 +229,20 @@ details.panel[open] > summary { margin-bottom: 12px; }
 @media (prefers-reduced-motion: reduce) {
   .pseat.turn .avatar, .pbet { animation: none; }
 }
+
+/* sedie libere (cambio posto) */
+.pchair {
+  position: absolute; transform: translate(-50%, -50%); z-index: 2;
+  width: 54px; height: 54px; border-radius: 50%;
+  border: 2px dashed rgba(255, 255, 255, .45); background: rgba(0, 0, 0, .25);
+  color: rgba(255, 255, 255, .85); font: inherit; cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1;
+  transition: background .2s, border-color .2s, transform .15s;
+}
+.pchair span { font-size: 1.3rem; font-weight: 700; }
+.pchair small { font-size: .58rem; text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+.pchair:hover:not(:disabled) { border-color: var(--accent); background: rgba(245, 197, 66, .18); color: var(--accent); }
+.pchair:active:not(:disabled) { transform: translate(-50%, -50%) scale(.94); }
+.pchair:disabled { cursor: default; opacity: .5; }
+.seat-hint { margin: 6px 0 0; }
+.seat-hint .linkish { font-size: .9rem; }

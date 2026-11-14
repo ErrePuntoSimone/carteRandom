@@ -15,7 +15,7 @@ function requireManager(room, player) {
 }
 
 const manager = createRoomManager({
-  maxPlayers: 12,
+  maxPlayers: 10, // come le sedie del tavolo
   createGame(host) {
     const t = E.createTable();
     E.addPlayer(t, host.id, host.name);
@@ -62,6 +62,12 @@ const manager = createRoomManager({
       const target = body.targetId || player.id;
       if (target !== player.id && !isHost(room, player)) throw httpError(403, 'Solo l\'host può farlo.');
       E.rebuy(room.game, target);
+    },
+    // cambiare sedia: ognuno per sé, l'host anche per gli altri
+    chair(room, player, body, { isHost }) {
+      const target = body.targetId || player.id;
+      if (target !== player.id && !isHost(room, player)) throw httpError(403, 'Solo l\'host può spostare gli altri.');
+      E.takeChair(room.game, target, body.chair);
     },
     seat(room, player, body, { requireHost }) {
       requireHost(room, player);
