@@ -18,6 +18,7 @@
   let managing = false;   // modalità "Gestisci" dell'host
   let actingFor = null;   // id del giocatore per cui l'host/dealer sta agendo
   let raiseOpen = false;
+  let choosingSeat = false; // "Cambia posto" tra una mano e l'altra
   let raiseKey = '';
   let lastTurnKey = '';
   const picks = {};       // vincitori selezionati per piatto: { 'mano-indice': Set }
@@ -108,6 +109,7 @@
     S = state;
     const t = S.table;
     if (!inHand()) actingFor = null;
+    if (t.phase !== 'over') choosingSeat = false;
     if (!isHost() || inHand()) managing = false;
     renderStatus(t);
     renderSeats(t);
@@ -165,6 +167,7 @@
     const online = Object.fromEntries(S.members.map((m) => [m.id, m.online]));
     $('seats').hidden = !managing;
     $('ptable').hidden = managing;
+    if (managing) $('seat-hint').hidden = true;
     if (!managing) return renderTable(t, online);
 
     $('seats').innerHTML = t.seats.map((s, i) => {
@@ -221,7 +224,12 @@
     const seats = t.seats;
     const count = seats.length;
     // chi guarda è sempre in basso; gli altri seguono l'ordine di gioco in senso orario
-    const meIdx = Math.max(0, seats.findIndex((s) => s.id === S.you));
+    // prima della partita (o con "Cambia posto") si vedono tutte le sedie, anche quelle libere
+    const chairMode = t.phase === 'lobby' || (t.phase === 'over' && choosingSeat);
+    const total = chairMode ? t.chairs : count;
+    const slotOf = (s, i) => (chairMode ? s.chair : i);
+    const mine = seats.findIndex((s) => s.id === S.you);
+    const meIdx = mine === -1 ? 0 : slotOf(seats[mine], mine);
     const won = {};
     if (over && t.lastResult) for (const r of t.lastResult) won[r.id] = r.amount;
     const eligible = new Set();
@@ -229,7 +237,7 @@
 
     // posizioni su un'ellisse: x/y in percentuale del tavolo
     const pos = (i, f) => {
-      const a = Math.PI / 2 + ((i - meIdx + count) % count) * (2 * Math.PI / count);
+      const a = Math.PI / 2 + ((i - meIdx + total) % total) * (2 * Math.PI / total);
       return { x: 50 + Math.cos(a) * 41 * f, y: 50 + Math.sin(a) * 43 * f, a };
     };
 
@@ -243,7 +251,7 @@
       street = t.phase === 'showdown' ? 'Showdown' : over ? 'Mano finita' : h.streetName;
     }
     const slots = Array.from({ length: 5 }, (_, i) => `<span class="slot ${i < revealed ? 'on' : ''}"></span>`).join('');
-    html += `<div class="center">
+    html += `<div class="tcenter">
       <div class="c-street">${esc(street)}</div>
       <div class="c-cards" aria-label="${revealed} carte comuni sul tavolo">${slots}</div>
       <div class="c-pot"><span class="chipdot"></span>${n(pot)}</div>
@@ -252,7 +260,8 @@
 
     seats.forEach((s, i) => {
       const hp = (showHand || over) && h ? h.players[s.id] : null;
-      const p = pos(i, 1);
+      const slot = slotOf(s, i);
+      const p = pos(slot, 1);
       const cls = ['pseat'];
       if (showHand && h.toAct === s.id) cls.push('turn');
       if (hp && hp.folded) cls.push('folded');
@@ -285,18 +294,34 @@
 
       // puntata davanti al giocatore
       if (hp && hp.bet > 0 && t.phase === 'betting') {
-        const b = pos(i, 0.56);
+        const b = pos(slot, 0.56);
         html += `<div class="pbet" style="left:${b.x}%;top:${b.y}%"><span class="chipdot"></span>${n(hp.bet)}</div>`;
       }
       // bottone del dealer sul panno, leggermente di lato
       if (s.id === dealerId) {
-        const a = p.a + (count > 2 ? 0.32 : 0.5);
+        const a = p.a + (total > 2 ? 0.32 : 0.5);
         html += `<div class="dbutton" style="left:${50 + Math.cos(a) * 41 * 0.7}%;top:${50 + Math.sin(a) * 43 * 0.7}%" title="Dealer">D</div>`;
       }
     });
 
+    // sedie libere: toccandole ci si siede
+    if (chairMode && seats.length < t.chairs) {
+      const used = new Set(seats.map((s) => s.chair));
+      const canMove = mine !== -1;
+      for (let c = 0; c < t.chairs; c++) {
+        if (used.has(c)) continue;
+        const p = pos(c, 1);
+        html += `<button type="button" class="pchair" style="left:${p.x}%;top:${p.y}%" data-chair="${c}" ${canMove ? '' : 'disabled'}
+          aria-label="Siediti al posto ${c + 1}"><span>+</span><small>Siediti</small></button>`;
+      }
+    }
     if (!count) html += '<p class="muted center empty">Nessun giocatore</p>';
     $('ptable').innerHTML = html;
+    const me = mine !== -1;
+    $('seat-hint').hidden = !(me && (t.phase === 'lobby' || t.phase === 'over'));
+    $('seat-hint').innerHTML = chairMode
+      ? `Tocca un posto libero per spostarti${t.phase === 'over' ? ' · <button type="button" class="linkish small" data-seat-done>Fatto</button>' : ''}`
+      : '<button type="button" class="linkish small" data-seat-choose>Cambia posto</button>';
     $('ptable').dataset.count = count;
   }
 
@@ -490,6 +515,19 @@
   $('btn-act-for').addEventListener('click', () => {
     actingFor = S.table.available && S.table.available.playerId;
     render(S);
+  });
+
+  // ---------- cambio posto ----------
+  $('ptable').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-chair]');
+    if (!b || b.disabled) return;
+    b.disabled = true;
+    const r = await run('chair', { chair: Number(b.dataset.chair) });
+    if (r) toast('Hai cambiato posto');
+  });
+  $('seat-hint').addEventListener('click', (e) => {
+    if (e.target.closest('[data-seat-choose]')) { choosingSeat = true; render(S); }
+    if (e.target.closest('[data-seat-done]')) { choosingSeat = false; render(S); }
   });
 
   // ---------- showdown ----------

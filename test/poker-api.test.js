@@ -77,3 +77,18 @@ test('chi esce durante la mano lascia le carte', async () => {
   assert.strictEqual(s.table.lastResult[0].name, 'A');
   assert.strictEqual(s.members.length, 1);
 });
+
+test('ognuno può cambiare il proprio posto, l\'host anche quello degli altri', async () => {
+  const a = (await post('/api/poker/rooms', { name: 'A' })).data;
+  const b = (await post(`/api/poker/rooms/${a.code}/join`, { name: 'B' })).data;
+  const c = (await post(`/api/poker/rooms/${a.code}/join`, { name: 'C' })).data;
+  const chair = (p, x) => post(`/api/poker/rooms/${a.code}/chair`, { ...p, ...x });
+  assert.strictEqual((await chair(b, { chair: 5 })).status, 200);
+  assert.strictEqual((await chair(c, { chair: 5 })).status, 400, 'posto occupato');
+  assert.strictEqual((await chair(b, { targetId: c.playerId, chair: 7 })).status, 403);
+  assert.strictEqual((await chair(a, { targetId: c.playerId, chair: 3 })).status, 200);
+  const s = await nextState(a.code, a);
+  assert.deepStrictEqual(s.table.seats.map((x) => [x.name, x.chair]), [['A', 0], ['C', 3], ['B', 5]]);
+  await post(`/api/poker/rooms/${a.code}/start`, a);
+  assert.strictEqual((await chair(b, { chair: 8 })).status, 400, 'non durante la mano');
+});

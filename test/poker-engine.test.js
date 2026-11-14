@@ -181,3 +181,24 @@ test('le fiches totali non cambiano mai', () => {
     assert.strictEqual(t.seats.reduce((s, x) => s + x.stack, 0), start, `mano ${hand + 1}`);
   }
 });
+
+test('cambio di posto prima della partita cambia l\'ordine di gioco', () => {
+  const t = table(['A', 'B', 'C']);
+  assert.deepStrictEqual(t.seats.map((s) => s.chair), [0, 1, 2]);
+  assert.throws(() => E.takeChair(t, 'A', 1), /occupato da B/);
+  assert.throws(() => E.takeChair(t, 'A', 10), /non valido/);
+  E.takeChair(t, 'A', 7); // ordine ora: B(1), C(2), A(7)
+  assert.deepStrictEqual(t.seats.map((s) => s.id), ['B', 'C', 'A']);
+  const h = E.startHand(t);
+  assert.strictEqual(h.dealerId, 'B');
+  assert.strictEqual(h.sbId, 'C');
+  assert.strictEqual(h.bbId, 'A');
+  assert.throws(() => E.takeChair(t, 'A', 5), /tra una mano e l'altra/);
+  E.act(t, 'B', { type: 'fold' });
+  E.act(t, 'C', { type: 'fold' });
+  E.takeChair(t, 'C', 9); // tra una mano e l'altra si può
+  assert.deepStrictEqual(t.seats.map((s) => s.id), ['B', 'A', 'C']);
+  // un nuovo arrivato prende la prima sedia libera
+  E.addPlayer(t, 'D', 'D');
+  assert.strictEqual(t.seats.find((s) => s.id === 'D').chair, 0);
+});

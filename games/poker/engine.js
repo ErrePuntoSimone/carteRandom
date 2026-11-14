@@ -6,6 +6,7 @@
 
 const STREETS = ['Preflop', 'Flop', 'Turn', 'River'];
 const MAX_LOG = 60;
+const CHAIRS = 10; // sedie al tavolo
 
 class GameError extends Error {
   constructor(message) { super(message); this.status = 400; }
@@ -19,7 +20,8 @@ function createTable(settings = {}) {
       bigBlind: 20,
       ...settings,
     },
-    seats: [],          // ordine dei posti al tavolo: [{ id, name, stack, sittingOut, leaving }]
+    chairs: CHAIRS,
+    seats: [],          // giocatori ordinati per sedia: [{ id, name, chair, stack, sittingOut, leaving }]
     dealerId: null,
     dealerIdx: -1,
     handNo: 0,
@@ -56,10 +58,35 @@ function nextAfter(order, fromId, pred, includeSelf = false) {
 }
 
 // ---------- giocatori ----------
+const sortSeats = (t) => t.seats.sort((a, b) => a.chair - b.chair);
+function freeChair(t) {
+  const used = new Set(t.seats.map((s) => s.chair));
+  for (let c = 0; c < t.chairs; c++) if (!used.has(c)) return c;
+  return -1;
+}
+
 function addPlayer(t, id, name) {
   if (seat(t, id)) return;
-  t.seats.push({ id, name, stack: t.settings.startingStack, sittingOut: false, leaving: false });
+  const chair = freeChair(t);
+  if (chair === -1) throw new GameError('Il tavolo è pieno.');
+  t.seats.push({ id, name, chair, stack: t.settings.startingStack, sittingOut: false, leaving: false });
+  sortSeats(t);
   log(t, `${name} si siede al tavolo con ${t.settings.startingStack}`);
+}
+
+// Un giocatore si sposta su una sedia libera (solo tra una mano e l'altra).
+function takeChair(t, id, chair) {
+  ensureBetweenHands(t);
+  const s = seat(t, id);
+  if (!s) throw new GameError('Giocatore non trovato.');
+  const c = toInt(chair);
+  if (!(c >= 0 && c < t.chairs)) throw new GameError('Posto non valido.');
+  if (s.chair === c) return;
+  const other = t.seats.find((x) => x.chair === c);
+  if (other) throw new GameError(`Il posto è già occupato da ${other.name}.`);
+  s.chair = c;
+  sortSeats(t);
+  log(t, `${s.name} cambia posto`);
 }
 
 // Un giocatore esce: se è in mano lascia le carte (fold), poi viene tolto a fine mano.
@@ -120,7 +147,8 @@ function moveSeat(t, id, dir) {
   const i = t.seats.findIndex((s) => s.id === id);
   const j = i + (dir < 0 ? -1 : 1);
   if (i === -1 || j < 0 || j >= t.seats.length) return;
-  [t.seats[i], t.seats[j]] = [t.seats[j], t.seats[i]];
+  [t.seats[i].chair, t.seats[j].chair] = [t.seats[j].chair, t.seats[i].chair];
+  sortSeats(t);
 }
 
 function setDealer(t, id) {
@@ -478,6 +506,7 @@ function publicView(t) {
     phase: t.phase,
     handNo: t.handNo,
     dealerId: t.dealerId,
+    chairs: t.chairs,
     seats: t.seats.map((s) => ({ ...s })),
     hand: h && {
       no: h.no, sb: h.sb, bb: h.bb, sbId: h.sbId, bbId: h.bbId, dealerId: h.dealerId,
@@ -493,6 +522,6 @@ function publicView(t) {
 
 module.exports = {
   GameError, STREETS,
-  createTable, addPlayer, removePlayer, setSittingOut, setStack, rebuy, moveSeat, setDealer,
+  createTable, addPlayer, takeChair, removePlayer, setSittingOut, setStack, rebuy, moveSeat, setDealer,
   updateSettings, startHand, act, award, available, computePots, publicView,
 };
