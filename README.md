@@ -102,6 +102,9 @@ public/fiches/         Conta fiches (solo lato browser)
 test/                  test automatici
 ```
 
+Chi apre un link d'invito (`/<gioco>/r/CODICE`) vede subito un grande pulsante "Entra" con il codice della stanza,
+mentre creare una nuova stanza resta un'alternativa discreta: così non si crea una stanza per sbaglio.
+
 Per aggiungere un minigioco: crea `public/<nome>/index.html`, aggiungi la voce al menu in
 `public/index.html` e, se serve un server, crea `games/<nome>/server.js` e registralo in `API` dentro `server.js`.
 Per un gioco multiplayer conviene usare `lib/rooms.js` (vedi `games/poker/server.js`).

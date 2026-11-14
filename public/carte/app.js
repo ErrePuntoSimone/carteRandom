@@ -42,6 +42,10 @@
     $('screen-room').hidden = true;
     $('screen-home').hidden = false;
     if (prefillCode) $('input-code').value = prefillCode;
+    // con un invito si mostra in grande "Entra"; creare un nuovo tavolo diventa l'alternativa
+    $('invite').hidden = !prefillCode;
+    $('home-main').hidden = !!prefillCode;
+    if (prefillCode) $('invite-code').textContent = prefillCode;
     $('home-error').textContent = error || '';
     $('who-name').textContent = Player.getName();
     $('link-change').href = Player.loginUrl(true);
@@ -304,6 +308,18 @@
     api(`/api/carte/rooms/${s.code}/leave`, { playerId: s.playerId, token: s.token }).catch(() => {});
     history.pushState(null, '', '/carte/');
     showHome();
+  });
+
+  $('btn-join-invite').addEventListener('click', () => {
+    $('input-code').value = $('invite-code').textContent;
+    $('form-join').requestSubmit();
+  });
+  $('btn-show-create').addEventListener('click', () => {
+    $('invite').hidden = true;
+    $('home-main').hidden = false;
+    $('input-code').value = '';
+    $('home-error').textContent = '';
+    history.replaceState(null, '', '/carte/');
   });
 
   window.addEventListener('popstate', route);

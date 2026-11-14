@@ -124,3 +124,11 @@ select, #custom-wrap { margin-bottom: 12px; }
 
 .who { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .linkish { background: none; border: none; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; padding: 4px 0; text-decoration: none; }
+
+/* invito: pulsante "Entra" ben visibile */
+.invite { border: 2px solid var(--accent); background: rgba(245, 197, 66, 0.12); text-align: center; }
+.invite-title { font-weight: 800; font-size: 1.15rem; }
+.invite-code { font-size: 2.2rem; font-weight: 900; letter-spacing: .3em; margin: 6px 0 14px; padding-left: .3em; }
+.btn.cta { font-size: 1.2rem; padding: 18px 20px; margin-bottom: 12px; box-shadow: 0 0 0 4px rgba(245, 197, 66, .25); animation: cta-pulse 2s ease-in-out infinite; }
+@keyframes cta-pulse { 50% { box-shadow: 0 0 0 8px rgba(245, 197, 66, .08); } }
+@media (prefers-reduced-motion: reduce) { .btn.cta { animation: none; } }
