@@ -8,6 +8,7 @@ Il nome si cambia dalla home o dal link "Cambia nome" dentro ai giochi.
 |---|---|---|
 | 🃏 **Carte Random** | `/carte/` | Multiplayer: crea una stanza e dai una carta a caso a ogni giocatore |
 | ♠️ **Poker** | `/poker/` | Multiplayer: gestisce una partita intera con le carte vere (turni, dealer, bui, puntate, fiches) |
+| 🏆 **Briscola** | `/briscola/` | Multiplayer: briscola con il mazzo napoletano, in 2 o in 4 a coppie |
 | 🪙 **Conta fiches** | `/fiches/` | Conta le fiches di ogni giocatore a poker e calcola chi paga chi |
 
 ## Carte Random
@@ -44,6 +45,21 @@ con il piatto, le carte comuni da girare, le puntate davanti a ognuno e il botto
   ricariche, giocatori che saltano le mani, rimozione. L'host o il dealer possono agire per chi ha il telefono scarico.
 - **Uscite:** chi esce durante una mano lascia le carte (fold) e viene tolto a fine mano.
 
+## Briscola
+
+Il classico con il mazzo napoletano da 40 carte. Il numero di giocatori è fisso:
+chi crea il tavolo sceglie **2 giocatori** oppure **4 a coppie** (i compagni sono uno di fronte all'altro),
+e il tavolo non accetta altre persone.
+
+- Tre carte a testa; la carta dopo la distribuzione è la **briscola**, scoperta in fondo al mazzo.
+- Si gioca una carta a testa: prende la briscola più alta o, se non ce ne sono, la carta più alta del seme di uscita
+  (Asso, Tre, Re, Cavallo, Fante, 7, 6, 5, 4, 2). Chi prende pesca per primo e gioca per primo.
+- Per giocare una carta la si tocca due volte (la prima la seleziona), così si evitano errori.
+- Ognuno vede solo le proprie carte; la presa resta sul tavolo un attimo prima di essere raccolta.
+- A fine partita si contano i punti (Asso 11, Tre 10, Re 4, Cavallo 3, Fante 2): vince chi supera 60 su 120.
+  Il mazziere ruota a ogni partita e si tiene il conto delle partite vinte.
+- In 4, prima di iniziare, con "Gioca prima/dopo" si scelgono le coppie. Chi esce interrompe la partita.
+
 ## Conta fiches
 
 Funziona su un solo dispositivo, senza server: i dati restano salvati nel browser.
@@ -75,11 +91,13 @@ lib/rooms.js           stanze multiplayer riutilizzabili (codici, giocatori, tem
 games/carte/           logica lato server di Carte Random (stanze, mazzi)
 games/poker/engine.js  regole del poker (puro, testato a parte)
 games/poker/server.js  API del poker sopra lib/rooms.js
+games/briscola/        regole (engine.js) e API (server.js) della Briscola
 public/index.html      menu dei minigiochi
 public/common.css      stile condiviso
 public/common.js       nome del giocatore ("login") condiviso tra i giochi
 public/carte/          interfaccia di Carte Random
 public/poker/          interfaccia del Poker
+public/briscola/       interfaccia della Briscola
 public/fiches/         Conta fiches (solo lato browser)
 test/                  test automatici
 ```
