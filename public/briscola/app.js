@@ -44,6 +44,10 @@
     $('screen-room').hidden = true;
     $('screen-home').hidden = false;
     if (prefill) $('input-code').value = prefill;
+    // con un invito si mostra in grande "Entra"; creare un nuovo tavolo diventa l'alternativa
+    $('invite').hidden = !prefill;
+    $('home-main').hidden = !!prefill;
+    if (prefill) $('invite-code').textContent = prefill;
     $('home-error').textContent = error || '';
     $('who-name').textContent = Player.getName();
     $('link-change').href = Player.loginUrl(true);
@@ -313,6 +317,18 @@
     }
     showHome(code);
   }
+  $('btn-join-invite').addEventListener('click', () => {
+    $('input-code').value = $('invite-code').textContent;
+    $('form-join').requestSubmit();
+  });
+  $('btn-show-create').addEventListener('click', () => {
+    $('invite').hidden = true;
+    $('home-main').hidden = false;
+    $('input-code').value = '';
+    $('home-error').textContent = '';
+    history.replaceState(null, '', '/briscola/');
+  });
+
   window.addEventListener('popstate', route);
 
   if (!Player.require()) return;

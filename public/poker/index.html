@@ -25,6 +25,16 @@
         <a id="link-change" class="linkish" href="/">Cambia nome</a>
       </div>
 
+      <!-- arrivo da un invito: il pulsante per entrare è il protagonista -->
+      <div id="invite" class="panel invite" hidden>
+        <div class="invite-title">Sei stato invitato! 🎉</div>
+        <div class="invite-code" id="invite-code" aria-label="Codice"></div>
+        <button id="btn-join-invite" class="btn primary block cta" type="button">Entra al tavolo</button>
+        <p class="muted small center">Non volevi entrare in questo tavolo? <button id="btn-show-create" class="linkish small" type="button">crea un nuovo tavolo</button></p>
+      </div>
+
+      <div id="home-main">
+
       <div class="panel">
         <button id="btn-create" class="btn primary block">Crea un tavolo</button>
       </div>
@@ -36,6 +46,7 @@
           <button class="btn" type="submit">Entra</button>
         </div>
       </form>
+      </div>
       <p id="home-error" class="error" role="alert"></p>
     </section>
 
