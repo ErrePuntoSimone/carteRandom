@@ -182,23 +182,19 @@ test('le fiches totali non cambiano mai', () => {
   }
 });
 
-test('cambio di posto prima della partita cambia l\'ordine di gioco', () => {
-  const t = table(['A', 'B', 'C']);
-  assert.deepStrictEqual(t.seats.map((s) => s.chair), [0, 1, 2]);
-  assert.throws(() => E.takeChair(t, 'A', 1), /occupato da B/);
-  assert.throws(() => E.takeChair(t, 'A', 10), /non valido/);
-  E.takeChair(t, 'A', 7); // ordine ora: B(1), C(2), A(7)
-  assert.deepStrictEqual(t.seats.map((s) => s.id), ['B', 'C', 'A']);
+test('spostarsi prima o dopo nell\'ordine di gioco', () => {
+  const t = table(['A', 'B', 'C', 'D']);
+  const ids = () => t.seats.map((s) => s.id).join('');
+  E.moveSeat(t, 'C', -1);
+  assert.strictEqual(ids(), 'ACBD');
+  E.moveSeat(t, 'A', -1); // il tavolo è circolare: il primo scambia con l'ultimo
+  assert.strictEqual(ids(), 'DCBA');
+  E.moveSeat(t, 'A', 1);
+  assert.strictEqual(ids(), 'ACBD');
+  assert.match(t.log[t.log.length - 1].text, /A ora gioca dopo D e prima di C/);
   const h = E.startHand(t);
-  assert.strictEqual(h.dealerId, 'B');
-  assert.strictEqual(h.sbId, 'C');
-  assert.strictEqual(h.bbId, 'A');
-  assert.throws(() => E.takeChair(t, 'A', 5), /tra una mano e l'altra/);
-  E.act(t, 'B', { type: 'fold' });
-  E.act(t, 'C', { type: 'fold' });
-  E.takeChair(t, 'C', 9); // tra una mano e l'altra si può
-  assert.deepStrictEqual(t.seats.map((s) => s.id), ['B', 'A', 'C']);
-  // un nuovo arrivato prende la prima sedia libera
-  E.addPlayer(t, 'D', 'D');
-  assert.strictEqual(t.seats.find((s) => s.id === 'D').chair, 0);
+  assert.deepStrictEqual([h.dealerId, h.sbId, h.bbId], ['A', 'C', 'B']);
+  assert.throws(() => E.moveSeat(t, 'A', 1), /tra una mano e l'altra/);
+  const two = table(['X', 'Y']);
+  assert.throws(() => E.moveSeat(two, 'X', 1), /due giocatori/);
 });

@@ -6,7 +6,6 @@
 
 const STREETS = ['Preflop', 'Flop', 'Turn', 'River'];
 const MAX_LOG = 60;
-const CHAIRS = 10; // sedie al tavolo
 
 class GameError extends Error {
   constructor(message) { super(message); this.status = 400; }
@@ -20,8 +19,7 @@ function createTable(settings = {}) {
       bigBlind: 20,
       ...settings,
     },
-    chairs: CHAIRS,
-    seats: [],          // giocatori ordinati per sedia: [{ id, name, chair, stack, sittingOut, leaving }]
+    seats: [],          // ordine di gioco al tavolo: [{ id, name, stack, sittingOut, leaving }]
     dealerId: null,
     dealerIdx: -1,
     handNo: 0,
@@ -58,35 +56,10 @@ function nextAfter(order, fromId, pred, includeSelf = false) {
 }
 
 // ---------- giocatori ----------
-const sortSeats = (t) => t.seats.sort((a, b) => a.chair - b.chair);
-function freeChair(t) {
-  const used = new Set(t.seats.map((s) => s.chair));
-  for (let c = 0; c < t.chairs; c++) if (!used.has(c)) return c;
-  return -1;
-}
-
 function addPlayer(t, id, name) {
   if (seat(t, id)) return;
-  const chair = freeChair(t);
-  if (chair === -1) throw new GameError('Il tavolo è pieno.');
-  t.seats.push({ id, name, chair, stack: t.settings.startingStack, sittingOut: false, leaving: false });
-  sortSeats(t);
+  t.seats.push({ id, name, stack: t.settings.startingStack, sittingOut: false, leaving: false });
   log(t, `${name} si siede al tavolo con ${t.settings.startingStack}`);
-}
-
-// Un giocatore si sposta su una sedia libera (solo tra una mano e l'altra).
-function takeChair(t, id, chair) {
-  ensureBetweenHands(t);
-  const s = seat(t, id);
-  if (!s) throw new GameError('Giocatore non trovato.');
-  const c = toInt(chair);
-  if (!(c >= 0 && c < t.chairs)) throw new GameError('Posto non valido.');
-  if (s.chair === c) return;
-  const other = t.seats.find((x) => x.chair === c);
-  if (other) throw new GameError(`Il posto è già occupato da ${other.name}.`);
-  s.chair = c;
-  sortSeats(t);
-  log(t, `${s.name} cambia posto`);
 }
 
 // Un giocatore esce: se è in mano lascia le carte (fold), poi viene tolto a fine mano.
@@ -142,13 +115,19 @@ function rebuy(t, id) {
   log(t, `${s.name} ricarica ${t.settings.startingStack} (ora ${s.stack})`);
 }
 
+// Sposta un giocatore di un posto prima (dir < 0) o dopo (dir > 0) nell'ordine di gioco,
+// scambiandolo con il vicino. Il tavolo è circolare: il primo può diventare l'ultimo.
 function moveSeat(t, id, dir) {
   ensureBetweenHands(t);
+  const n = t.seats.length;
   const i = t.seats.findIndex((s) => s.id === id);
-  const j = i + (dir < 0 ? -1 : 1);
-  if (i === -1 || j < 0 || j >= t.seats.length) return;
-  [t.seats[i].chair, t.seats[j].chair] = [t.seats[j].chair, t.seats[i].chair];
-  sortSeats(t);
+  if (i === -1) throw new GameError('Giocatore non trovato.');
+  if (n < 3) throw new GameError('Con due giocatori l\'ordine non cambia.');
+  const j = (i + (Number(dir) < 0 ? -1 : 1) + n) % n;
+  [t.seats[i], t.seats[j]] = [t.seats[j], t.seats[i]];
+  const before = t.seats[(j - 1 + n) % n].name;
+  const after = t.seats[(j + 1) % n].name;
+  log(t, `${t.seats[j].name} ora gioca dopo ${before} e prima di ${after}`);
 }
 
 function setDealer(t, id) {
@@ -506,7 +485,6 @@ function publicView(t) {
     phase: t.phase,
     handNo: t.handNo,
     dealerId: t.dealerId,
-    chairs: t.chairs,
     seats: t.seats.map((s) => ({ ...s })),
     hand: h && {
       no: h.no, sb: h.sb, bb: h.bb, sbId: h.sbId, bbId: h.bbId, dealerId: h.dealerId,
@@ -522,6 +500,6 @@ function publicView(t) {
 
 module.exports = {
   GameError, STREETS,
-  createTable, addPlayer, takeChair, removePlayer, setSittingOut, setStack, rebuy, moveSeat, setDealer,
+  createTable, addPlayer, removePlayer, setSittingOut, setStack, rebuy, moveSeat, setDealer,
   updateSettings, startHand, act, award, available, computePots, publicView,
 };

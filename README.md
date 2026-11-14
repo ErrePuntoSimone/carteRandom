@@ -31,8 +31,8 @@ Ognuno si siede al tavolo dal proprio telefono con il codice o il link.
 I giocatori sono disegnati intorno a un tavolo da poker (tu sei sempre in basso, gli altri in ordine di gioco),
 con il piatto, le carte comuni da girare, le puntate davanti a ognuno e il bottone del dealer.
 
-- **Posti:** il tavolo ha 10 sedie. Prima della partita ognuno tocca una sedia libera per sedersi dove vuole
-  (come al tavolo vero); tra una mano e l'altra c'è "Cambia posto". L'ordine di gioco segue le sedie.
+- **Ordine al tavolo:** prima della partita e tra una mano e l'altra ognuno può spostarsi
+  "prima" o "dopo" nel giro (si scambia con il vicino), così l'ordine corrisponde a come siete seduti.
 - **Dealer e bui:** il bottone gira da solo a ogni mano, i bui vengono messi in automatico
   (in due giocatori il dealer mette il piccolo buio, come da regolamento).
 - **Turni:** l'app dice a chi tocca e cosa fare con le carte ("gira il flop", "gira il turn"…).
