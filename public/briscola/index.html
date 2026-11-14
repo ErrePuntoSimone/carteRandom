@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f5132">
+  <title>Briscola · Minigiochi</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏆</text></svg>">
+  <link rel="stylesheet" href="/common.css">
+  <link rel="stylesheet" href="/briscola/style.css">
+</head>
+<body>
+  <main id="app">
+    <!-- HOME -->
+    <section id="screen-home" hidden>
+      <a class="back" href="/">← Menu</a>
+      <header class="hero">
+        <div class="logo">🏆</div>
+        <h1>Briscola</h1>
+        <p class="sub">Con il mazzo napoletano, in 2 oppure in 4 a coppie.</p>
+      </header>
+
+      <div class="panel who">
+        <span>Giochi come <strong id="who-name"></strong></span>
+        <a id="link-change" class="linkish" href="/">Cambia nome</a>
+      </div>
+
+      <div class="panel">
+        <label>Crea un tavolo</label>
+        <div class="mode-choice">
+          <button class="btn primary" data-create="2"><span class="big">2</span>giocatori</button>
+          <button class="btn primary" data-create="4"><span class="big">4</span>a coppie</button>
+        </div>
+      </div>
+
+      <form id="form-join" class="panel" autocomplete="off">
+        <label for="input-code">Hai un codice?</label>
+        <div class="row">
+          <input id="input-code" maxlength="5" placeholder="ABCDE" class="code-input" autocapitalize="characters" spellcheck="false">
+          <button class="btn" type="submit">Entra</button>
+        </div>
+      </form>
+      <p id="home-error" class="error" role="alert"></p>
+    </section>
+
+    <!-- TAVOLO -->
+    <section id="screen-room" hidden>
+      <header class="room-head">
+        <div>
+          <span class="muted small" id="room-mode">Tavolo</span>
+          <div class="room-code" id="room-code">-----</div>
+        </div>
+        <div class="head-actions">
+          <button id="btn-share" class="btn small">Invita</button>
+          <button id="btn-leave" class="btn small ghost">Esci</button>
+        </div>
+      </header>
+
+      <div id="conn-banner" class="banner" hidden>Riconnessione…</div>
+
+      <div id="score" class="score"></div>
+
+      <!-- fine partita -->
+      <div id="result" class="panel result" hidden>
+        <h2 id="result-title">Fine partita</h2>
+        <div id="result-body"></div>
+      </div>
+
+      <!-- sala d'attesa -->
+      <div id="lobby" class="panel" hidden>
+        <h2>Giocatori <span id="lobby-count" class="pill"></span></h2>
+        <div id="lobby-list"></div>
+        <div id="lobby-move" class="lobby-move" hidden></div>
+        <div id="host-controls" hidden>
+          <div class="seg" id="mode-seg" role="group" aria-label="Numero di giocatori">
+            <button type="button" data-mode="2">In 2</button>
+            <button type="button" data-mode="4">In 4 a coppie</button>
+          </div>
+        </div>
+        <button id="btn-start" class="btn primary block">Inizia la partita</button>
+        <p id="lobby-hint" class="muted small center"></p>
+      </div>
+
+      <!-- tavolo di gioco -->
+      <div id="board" class="board" hidden>
+        <div class="seat-pos top" id="pos-top"></div>
+        <div class="seat-pos left" id="pos-left"></div>
+        <div class="seat-pos right" id="pos-right"></div>
+        <div class="deck-area" id="deck-area"></div>
+        <div class="trick" id="trick"></div>
+        <div class="turn-msg" id="turn-msg"></div>
+      </div>
+
+      <div id="hand-area" class="hand-area" hidden>
+        <div class="me-line" id="me-line"></div>
+        <div class="hand" id="hand"></div>
+        <p class="muted small center" id="hand-hint"></p>
+      </div>
+
+      <details class="panel" id="log-panel">
+        <summary><h2>Cronologia</h2></summary>
+        <ol id="log" class="log"></ol>
+      </details>
+      <p id="room-error" class="error center" role="alert"></p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/common.js"></script>
+  <script src="/briscola/app.js"></script>
+</body>
+</html>
