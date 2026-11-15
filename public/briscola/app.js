@@ -8,7 +8,7 @@
   };
   const KEY = (code) => 'briscola:' + code;
   const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const SUIT_ICON = { denari: '🪙', coppe: '🏆', spade: '⚔️', bastoni: '🪵' };
+  const SUIT_ICON = { denari: '🪙', coppe: '🏆', spade: '⚔️', bastoni: '🪵' }; // solo per il testo "mazzo finito"
 
   let session = null;
   let S = null;
@@ -97,13 +97,7 @@
   // ---------- carte ----------
   function cardHtml(c, extra = '', tag = 'div', attrs = '') {
     const trump = S && S.game.briscola && c.suit === S.game.briscola.suit ? ' is-trump' : '';
-    const icon = SUIT_ICON[c.suit];
-    return `<${tag} class="card ${c.suit}${trump} ${extra}" ${attrs} title="${esc(c.name)}" aria-label="${esc(c.name)}">
-      <span class="cr">${esc(c.label)}<span class="s">${icon}</span></span>
-      <span class="cc">${icon}</span>
-      <span class="cn">${esc(c.name)}</span>
-      <span class="cb">${esc(c.label)}<span class="s">${icon}</span></span>
-    </${tag}>`;
+    return `<${tag} class="card ${c.suit}${trump} ${extra}" ${attrs} title="${esc(c.name)}" aria-label="${esc(c.name)}">${CardArt.html(c.suit, c.rank)}</${tag}>`;
   }
 
   // ---------- render ----------
