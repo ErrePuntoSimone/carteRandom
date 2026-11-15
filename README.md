@@ -54,6 +54,8 @@ e il tavolo non accetta altre persone.
 - Tre carte a testa; la carta dopo la distribuzione è la **briscola**, scoperta in fondo al mazzo.
 - Si gioca una carta a testa: prende la briscola più alta o, se non ce ne sono, la carta più alta del seme di uscita
   (Asso, Tre, Re, Cavallo, Fante, 7, 6, 5, 4, 2). Chi prende pesca per primo e gioca per primo.
+- Le carte sono disegnate in SVG come quelle napoletane vere: monete, coppe, spade e bastoni nodosi, con i simboli
+  disposti come sul mazzo e le figure di Fante, Cavallo e Re (`public/briscola/cards.js`). Una stella segna le briscole.
 - Per giocare una carta la si tocca due volte (la prima la seleziona), così si evitano errori.
 - Ognuno vede solo le proprie carte; la presa resta sul tavolo un attimo prima di essere raccolta.
 - A fine partita si contano i punti (Asso 11, Tre 10, Re 4, Cavallo 3, Fante 2): vince chi supera 60 su 120.
