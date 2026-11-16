@@ -93,7 +93,7 @@ un'isola galleggiante e tre piattaforme sospese. Lo scopo è buttare fuori dallo
   (gatto cavaliere con spada e scudo, solido e preciso).
 - **Colore dei dettagli:** nella sala d'attesa ognuno sceglie un colore (o i colori originali) che si applica a pochi
   dettagli del personaggio: polsini dei guantoni, strisce delle scarpe, fibbia, e la bandana di Pepe, la stella e il
-  fermacoda di Gilda, la fascia sulla canottiera di Tonno. I bot ne prendono uno a caso.
+  fermacoda di Gilda, la fascia sulla canottiera di Tonno, il mantello di Micio. I bot ne prendono uno a caso.
 - **Controlli:** sul telefono in orizzontale joystick a sinistra e pulsanti Salta, Pugno, Forte, Schiva a destra;
   sul computer A/D o frecce, W/↑/spazio per saltare, S/↓ giù, J pugno, K forte, L o Maiusc schiva.
 - **Rete:** come Rissa, il server simula a 30 passi al secondo e decide i colpi; il telefono prevede la propria fisica
@@ -117,6 +117,9 @@ Se le immagini mancano, il gioco usa il disegno a codice (`public/spintoni/draw.
   "sagoma" (personaggio bianco su nero, con i dettagli colorabili in un colore acceso). Nel file di mappa si indica, per
   ogni animazione, quali fotogrammi usare: così l'ordine della griglia di origine può essere qualsiasi. Lo strumento
   rende trasparente lo sfondo, estrae i dettagli colorabili e scrive PNG, maschera e JSON nello schema standard.
+  Oltre ai dettagli segnati con un colore acceso nella sagoma, `color_rules` nel file di mappa permette di rendere
+  colorabili zone riconosciute dal colore (per Micio, il mantello crema): intervalli di tinta, saturazione e
+  luminosità, vincolo di posizione rispetto alla testa e pulizia delle macchie. Richiede Pillow e numpy.
 - **Cambiare la grafica:** basta sostituire un `.png` mantenendo lo stesso schema (cella, punto d'appoggio, ordine e
   numero dei fotogrammi del `.json`). Il test `test/spintoni-sprites.test.js` controlla che lo schema sia rispettato.
 - **Temporizzazione:** i pugni hanno tre fasi (carica, colpo, recupero) che seguono i tempi del gioco, così il fotogramma
