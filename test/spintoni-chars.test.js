@@ -88,3 +88,16 @@ test('parata: chi para non prende danno e risponde lanciando l\'attaccante', () 
   assert.strictEqual(B.dmg, 0);
   assert.ok(A.dmg > 0 && A.hs > 0, 'l\'attaccante viene lanciato');
 });
+
+test('effetti visivi: ogni personaggio ha colore, bagliore e forma delle particelle validi', () => {
+  const S = require('../public/spintoni/shared');
+  const SHAPES = ['dot', 'spark', 'star', 'drop', 'slash'];
+  const SPECIALS = [undefined, 'vortex', 'guard', 'thrust', 'charge'];
+  for (const [id, c] of Object.entries(S.CHARS)) {
+    if (id.startsWith('test_')) continue; // personaggi finti dei test qui sopra
+    assert.match(c.fx.color, /^#[0-9a-f]{6}$/i, id);
+    assert.match(c.fx.glow, /^#[0-9a-f]{6}$/i, id);
+    assert.ok(SHAPES.includes(c.fx.shape), `${id}: forma ${c.fx.shape}`);
+    assert.ok(SPECIALS.includes(c.fx.special), `${id}: speciale ${c.fx.special}`);
+  }
+});

@@ -8,6 +8,8 @@
   color: '#ab47bc',
   desc: 'Equilibrata: né troppo pesante né troppo leggera.',
   stats: { speed: 560, jump: 1070, weight: 1.0, power: 1.0 },
+  // effetti visivi (solo grafica): stelline viola, la speciale è la guardia (scudo)
+  fx: { color: '#ce93d8', glow: '#fff59d', shape: 'star', special: 'guard' },
   moves: {
     special: {
       name: 'Contrattacco', desc: 'Si mette in guardia: se la colpiscono in quel momento para e risponde con un pugno fortissimo.',

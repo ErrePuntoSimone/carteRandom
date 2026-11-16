@@ -143,10 +143,151 @@ window.SpintoniDraw = (() => {
   function fighter(ctx, x, y, st, slot, now, opts = {}) {
     chargeAura(ctx, x, y, st, now);
     moveAura(ctx, x, y, st, now);
+    specialFx(ctx, x, y, st, now, 'back');
     const spr = window.SpintoniSprites && window.SpintoniSprites.get(st.c);
-    if (spr) { spriteFighter(ctx, x, y, st, now, spr, opts.color); nameTag(ctx, x, y, slot, opts); }
+    if (spr) { spriteFighter(ctx, x, y, st, now, spr, opts.color, opts.flash); nameTag(ctx, x, y, slot, opts); }
     else vectorFighter(ctx, x, y, st, slot, now, opts);
+    swingTrail(ctx, x, y, st);
+    specialFx(ctx, x, y, st, now, 'front');
     chargeBar(ctx, x, y, st, now);
+  }
+
+  // ---------- effetti dei colpi (solo grafica, calcolati dallo stato: nessun dato in più dalla rete) ----------
+  const fxOf = (c) => (CHARS[c] || CHARS.gilda).fx;
+  function rgba(hex, a) {
+    const n = parseInt(hex.slice(1), 16);
+    return `rgba(${n >> 16}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+  }
+  // angolo nel mondo da un angolo "locale" (0 = avanti, negativo = in alto) e dalla direzione in cui si guarda
+  const worldAng = (a, face) => (face > 0 ? a : Math.PI - a);
+  const deg = Math.PI / 180;
+  // arco descritto dal colpo per ogni direzione: [inizio, fine] in gradi locali
+  const SWEEP = { side: [-70, 25], up: [10, -190], down: [-15, 55], downair: [20, 160] };
+  const TRAIL_LINGER = 0.07; // la scia resta ancora un attimo dopo il colpo
+
+  // Scia a mezzaluna nel colore del personaggio mentre il colpo è attivo.
+  function swingTrail(ctx, x, y, st) {
+    const a = st.a;
+    if (!a) return;
+    const m = moveOf(st.c, a.ty);
+    const fx = fxOf(st.c);
+    if (a.ty === 'special' && fx.special) return; // le speciali hanno un effetto proprio
+    const b = m.boxes && (m.boxes[a.dir] || m.boxes.side);
+    if (!b || !(m.active > 0)) return;
+    const p = (a.t - m.startup) / (m.active + TRAIL_LINGER);
+    if (p < 0 || p > 1) return;
+    const key = a.dir === 'down' && a.air ? 'downair' : a.dir;
+    const [s0, s1] = SWEEP[key] || SWEEP.side;
+    const reach = Math.max(50, Math.hypot(b.x + b.w, b.y + b.h / 2 + 50) * 0.85);
+    const heavy = a.ty !== 'light';
+    const face = st.fc || 1;
+    const cx = x, cy = y - 50;
+    const end = s0 + (s1 - s0) * Math.min(1, p * 1.8);
+    const fade = 1 - p;
+    const arc = (r, w, style) => {
+      ctx.strokeStyle = style; ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, worldAng(s0 * deg, face), worldAng(end * deg, face), (face > 0) === (s1 < s0));
+      ctx.stroke();
+    };
+    ctx.save();
+    ctx.lineCap = 'round';
+    arc(reach * 0.88, (heavy ? 26 : 16) * (0.6 + 0.4 * fade), rgba(fx.color, 0.35 * fade));
+    arc(reach, (heavy ? 7 : 4), rgba(fx.glow, 0.9 * fade));
+    ctx.restore();
+  }
+
+  // Effetto proprio della speciale di ogni personaggio (fx.special nel file del personaggio).
+  // layer 'back' = dietro al lottatore, 'front' = davanti.
+  function specialFx(ctx, x, y, st, now, layer) {
+    const a = st.a;
+    if (!a || a.ty !== 'special') return;
+    const m = moveOf(st.c, 'special');
+    const fx = fxOf(st.c);
+    const face = st.fc || 1;
+    const t = a.t, on = t >= m.startup && t < m.startup + m.active + TRAIL_LINGER;
+    const cy = y - 50;
+    ctx.save();
+    ctx.lineCap = 'round';
+    if (fx.special === 'vortex' && layer === 'front' && on) {
+      // anelli che girano attorno al corpo
+      for (let i = 0; i < 3; i++) {
+        const rot = now / 70 + i * 2.1;
+        ctx.strokeStyle = rgba(i % 2 ? fx.glow : fx.color, 0.75);
+        ctx.lineWidth = 5 - i;
+        ctx.beginPath();
+        ctx.ellipse(x, cy - 10 + i * 18, 62 - i * 8, 20, 0, rot, rot + 3.6);
+        ctx.stroke();
+      }
+    } else if (fx.special === 'thrust' && layer === 'front' && on) {
+      // lama tesa: una lunga striscia luminosa e linee di velocità dietro
+      const b = m.boxes.side;
+      const x0 = x + face * b.x, x1 = x + face * (b.x + b.w);
+      const yy = y + b.y + b.h / 2;
+      const g = ctx.createLinearGradient(x0, 0, x1, 0);
+      g.addColorStop(0, rgba(fx.glow, 0)); g.addColorStop(1, rgba(fx.color, 0.95));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(x0, yy - 10); ctx.lineTo(x1, yy - 2); ctx.lineTo(x1 + face * 18, yy); ctx.lineTo(x1, yy + 2); ctx.lineTo(x0, yy + 10); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = rgba(fx.glow, 0.6); ctx.lineWidth = 3;
+      for (let i = 0; i < 4; i++) {
+        const ly = cy - 30 + i * 20, lx = x - face * (40 + ((now / 4 + i * 37) % 60));
+        ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx - face * 50, ly); ctx.stroke();
+      }
+    } else if (fx.special === 'charge' && layer === 'back' && t >= m.startup && t < m.startup + m.active) {
+      // carica: cuneo d'aria davanti e scie dietro
+      ctx.fillStyle = rgba(fx.color, 0.28);
+      ctx.beginPath(); ctx.moveTo(x + face * 20, cy - 45); ctx.lineTo(x + face * 95, cy + 5); ctx.lineTo(x + face * 20, cy + 50); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = rgba(fx.glow, 0.7); ctx.lineWidth = 4;
+      for (let i = 0; i < 5; i++) {
+        const ly = cy - 36 + i * 18, lx = x - face * (30 + ((now / 3 + i * 41) % 70));
+        ctx.beginPath(); ctx.moveTo(lx, ly); ctx.lineTo(lx - face * 60, ly); ctx.stroke();
+      }
+    } else if (fx.special === 'guard' && layer === 'front') {
+      // guardia: stelline che girano sullo scudo della parata (lo scudo azzurro lo disegna moveAura)
+      const w = m.counter;
+      if (w && t >= w.from && t < w.to) {
+        ctx.fillStyle = rgba(fx.glow, 0.9);
+        for (let i = 0; i < 5; i++) {
+          const ang = now / 160 + (i * TAU) / 5;
+          ctx.beginPath(); star(ctx, x + Math.cos(ang) * 60, cy + 6 + Math.sin(ang) * 60, 6); ctx.fill();
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  // Forma di una particella (shape del personaggio): punto, scintilla, stellina, goccia o fendente.
+  function particle(ctx, p, k) {
+    const r = p.size * (1 - k * 0.5);
+    ctx.fillStyle = p.color; ctx.strokeStyle = p.color;
+    if (p.shape === 'spark' || p.shape === 'slash') {
+      const len = p.shape === 'slash' ? 5 : 3, sp = Math.hypot(p.vx, p.vy) || 1;
+      ctx.lineWidth = p.shape === 'slash' ? r * 0.7 : r * 0.9; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - (p.vx / sp) * r * len, p.y - (p.vy / sp) * r * len); ctx.stroke();
+    } else if (p.shape === 'star') {
+      ctx.beginPath(); star(ctx, p.x, p.y, r * 1.3); ctx.fill();
+    } else if (p.shape === 'drop') {
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, r * 0.8, r * 1.2, Math.atan2(p.vy, p.vx) + Math.PI / 2, 0, TAU); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, TAU); ctx.fill();
+    }
+  }
+
+  // Lampo d'impatto: stella a punte che si apre e svanisce.
+  function impact(ctx, x, y, r, k, color) {
+    const n = 8, rr0 = r * (0.6 + 0.6 * k);
+    ctx.save();
+    ctx.globalAlpha = 1 - k;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    for (let i = 0; i < n * 2; i++) {
+      const a = (i * Math.PI) / n + 0.3, rad = i % 2 ? rr0 * 0.35 : rr0;
+      ctx.lineTo(x + Math.cos(a) * rad, y + Math.sin(a) * rad);
+    }
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(x, y, rr0 * 0.25, 0, TAU); ctx.fill();
+    ctx.restore();
   }
 
   // Finestre speciali della mossa in corso: parata (scudo azzurro) e corazza (alone arancio).
@@ -224,7 +365,7 @@ window.SpintoniDraw = (() => {
   }
 
   // Disegno con le immagini PNG (sprite sheet).
-  function spriteFighter(ctx, x, y, st, now, spr, color) {
+  function spriteFighter(ctx, x, y, st, now, spr, color, flash) {
     const f = st.fc || 1;
     const { name, frame, tumble } = window.SpintoniSprites.pick(st, now, spr);
     ctx.save();
@@ -240,6 +381,13 @@ window.SpintoniDraw = (() => {
     } else {
       window.SpintoniSprites.drawFrame(ctx, spr, name, frame, x, y, f);
       window.SpintoniSprites.drawTint(ctx, spr, name, frame, x, y, f, color);
+    }
+    // appena colpito: il lottatore lampeggia chiaro (si ridisegna sommando la luce)
+    if (flash > 0) {
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.7 * flash;
+      if (tumble) window.SpintoniSprites.drawFrame(ctx, spr, name, frame, 0, 44, f);
+      else window.SpintoniSprites.drawFrame(ctx, spr, name, frame, x, y, f);
     }
     ctx.restore();
   }
@@ -429,5 +577,5 @@ window.SpintoniDraw = (() => {
     return '#e53935';
   }
 
-  return { sky, makeScene, mapReady: () => map.ready, paint: { scenery: paintScenery, island: paintIsland, platform: paintPlatform }, SCENE, fighter, portrait, dmgColor, SLOT_COLORS };
+  return { sky, makeScene, mapReady: () => map.ready, paint: { scenery: paintScenery, island: paintIsland, platform: paintPlatform }, SCENE, fighter, portrait, dmgColor, SLOT_COLORS, fxOf, particle, impact };
 })();

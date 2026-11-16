@@ -8,6 +8,8 @@
   color: '#42a5f5',
   desc: 'Massiccio e potente: lentissimo e con salti bassi, ma quasi impossibile da buttare fuori e picchia durissimo.',
   stats: { speed: 390, jump: 980, weight: 1.45, power: 1.28 },
+  // effetti visivi (solo grafica): spruzzi d'acqua, la speciale è una carica a testa bassa
+  fx: { color: '#4fc3f7', glow: '#e1f5fe', shape: 'drop', special: 'charge' },
   moves: {
     special: {
       name: 'Carica del toro', desc: 'Corre in avanti a testa bassa: i colpi ricevuti fanno danno ma non lo fermano.',

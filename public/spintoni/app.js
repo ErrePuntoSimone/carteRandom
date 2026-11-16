@@ -222,7 +222,9 @@
     let heavyBtn = false;           // pulsante Forte tenuto premuto (touch / mouse): serve per caricare il colpo
     const keys = new Set();
     let stick = null;               // joystick sinistro
-    let particles = [], rings = [], shake = 0, cardsKey = '';
+    let particles = [], rings = [], impacts = [], shake = 0, cardsKey = '';
+    const flashUntil = new Map(); // id -> fine del lampo di chi è appena stato colpito
+    const wasGround = new Map();  // id -> era a terra nel fotogramma prima (per la polvere)
 
     function resize() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -247,7 +249,7 @@
       clearInterval(cdTimer); cdTimer = setInterval(cdTick, 100);
       snaps = []; last = null; clockOffset = null;
       seq = 0; pending = []; pred = null; prevPred = null; meAlive = false;
-      particles = []; rings = []; shake = 0; cardsKey = ''; spKey = '-';
+      particles = []; rings = []; impacts = []; shake = 0; cardsKey = ''; spKey = '-'; flashUntil.clear(); wasGround.clear();
       resize();
       connect();
       sendTimer = setInterval(sendInput, S.TICK * 1000);
@@ -302,17 +304,27 @@
       updateHud(m);
     }
 
+    // stile degli effetti (colore e forma delle particelle) del personaggio di un lottatore
+    const fxOfId = (id) => { const f = last && last.f.get(id); return D.fxOf(f ? f.c : null); };
+
     function onEvent(ev) {
       if (ev.t === 'hit') {
         if (ev.arm) { burst(ev.x, ev.y, '#ffb74d', 10, 260); return; } // colpo assorbito dalla corazza
         const heavy = ev.ty !== 'light';
         const ch = ev.ch || 0; // quanto era carico il colpo (0..1)
-        burst(ev.x, ev.y, heavy ? '#ffeb3b' : '#ffffff', heavy ? 18 + Math.round(30 * ch) : 9, heavy ? 520 + 300 * ch : 320);
+        const fx = fxOfId(ev.by); // le particelle sono del personaggio che colpisce
+        burst(ev.x, ev.y, heavy ? '#ffeb3b' : '#ffffff', heavy ? 8 + Math.round(12 * ch) : 4, heavy ? 520 + 300 * ch : 320);
+        burst(ev.x, ev.y, fx.color, heavy ? 12 + Math.round(18 * ch) : 6, heavy ? 560 + 300 * ch : 360, fx.shape);
+        burst(ev.x, ev.y, fx.glow, heavy ? 6 : 3, heavy ? 420 : 260, fx.shape);
+        impacts.push({ x: ev.x, y: ev.y, born: performance.now(), r: heavy ? 46 + 40 * ch : 28, color: fx.glow, life: heavy ? 170 : 110 });
+        flashUntil.set(ev.id, performance.now() + (heavy ? 140 : 90));
         rings.push({ x: ev.x, y: ev.y, born: performance.now(), r: heavy ? 70 + 70 * ch : 40 });
         shake = Math.max(shake, Math.min(16, ev.kb / 90));
         if ((ev.id === R.you || ev.by === R.you) && navigator.vibrate) navigator.vibrate(heavy ? 35 : 15);
       } else if (ev.t === 'ko') {
-        burst(ev.x, ev.y, '#ff5252', 40, 900);
+        const fx = fxOfId(ev.id);
+        burst(ev.x, ev.y, '#ff5252', 24, 900);
+        burst(ev.x, ev.y, fx.color, 24, 1000, fx.shape);
         rings.push({ x: ev.x, y: ev.y, born: performance.now(), r: 260, ko: true });
         shake = 22;
         const b = $('banner');
@@ -323,19 +335,30 @@
         onEvent.t = setTimeout(() => { b.hidden = true; }, 1300);
         if (navigator.vibrate && (ev.id === R.you || ev.by === R.you)) navigator.vibrate([60, 40, 90]);
       } else if (ev.t === 'counter') {
-        burst(ev.x, ev.y, '#80deea', 26, 600);
+        const fx = fxOfId(ev.id);
+        burst(ev.x, ev.y, '#80deea', 14, 600);
+        burst(ev.x, ev.y, fx.glow, 14, 650, fx.shape);
+        impacts.push({ x: ev.x, y: ev.y, born: performance.now(), r: 70, color: '#80deea', life: 200 });
         rings.push({ x: ev.x, y: ev.y, born: performance.now(), r: 110 });
         shake = Math.max(shake, 10);
       } else if (ev.t === 'spawn') {
         burst(ev.x, ev.y, '#81d4fa', 14, 300);
       }
     }
-    function burst(x, y, color, n, speed) {
+    function burst(x, y, color, n, speed, shape) {
       for (let i = 0; i < n; i++) {
         const a = Math.random() * Math.PI * 2, s = speed * (0.3 + Math.random() * 0.7);
-        particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.3 + Math.random() * 0.35, t: 0, color, size: 3 + Math.random() * 4 });
+        particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.3 + Math.random() * 0.35, t: 0, color, size: 3 + Math.random() * 4, shape, g: shape === 'drop' ? 1600 : 0 });
       }
       if (particles.length > 500) particles.splice(0, particles.length - 500);
+    }
+
+    // nuvoletta di polvere ai piedi, verso i lati
+    function dust(x, y, n) {
+      for (let i = 0; i < n; i++) {
+        const side = i % 2 ? 1 : -1, s = 80 + Math.random() * 160;
+        particles.push({ x: x + side * 10, y: y - 4, vx: side * s, vy: -20 - Math.random() * 60, life: 0.3 + Math.random() * 0.25, t: 0, color: 'rgba(235, 225, 210, .8)', size: 4 + Math.random() * 4 });
+      }
     }
 
     // conto alla rovescia: la fine arriva sia dallo stato della stanza (SSE) sia dagli snapshot, così si vede anche
@@ -548,7 +571,12 @@
         if (st.hs > 0.1 && Math.hypot(st.vx, st.vy) > 700) {
           particles.push({ x: st.x, y: st.y - 44, vx: 0, vy: 0, life: 0.35, t: 0, color: 'rgba(255,255,255,.7)', size: 9 });
         }
-        D.fighter(ctx, st.x, st.y, st, f.sl, now, { name: f.id === R.you ? 'Tu' : nameOf(f.id), color: colorOf(f.id) });
+        // polvere quando si atterra o si salta da terra
+        const wg = wasGround.get(f.id);
+        if (wg !== undefined && wg !== !!st.g) dust(st.x, st.y, st.g ? 8 : 5);
+        wasGround.set(f.id, !!st.g);
+        const fl = Math.max(0, ((flashUntil.get(f.id) || 0) - now) / 140);
+        D.fighter(ctx, st.x, st.y, st, f.sl, now, { name: f.id === R.you ? 'Tu' : nameOf(f.id), color: colorOf(f.id), flash: fl });
       }
 
       for (const r of rings) {
@@ -559,11 +587,12 @@
         ctx.beginPath(); ctx.arc(r.x, r.y, r.r * (0.3 + t), 0, Math.PI * 2); ctx.stroke();
       }
       rings = rings.filter((r) => now - r.born < 600);
+      for (const im of impacts) D.impact(ctx, im.x, im.y, im.r, Math.min(1, (now - im.born) / im.life), im.color);
+      impacts = impacts.filter((im) => now - im.born < im.life);
       for (const p of particles) {
-        p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.88; p.vy *= 0.88;
+        p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.88; p.vy *= 0.88; p.vy += (p.g || 0) * dt;
         ctx.globalAlpha = Math.max(0, 1 - p.t / p.life);
-        ctx.fillStyle = p.color;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (1 - p.t / p.life * 0.5), 0, Math.PI * 2); ctx.fill();
+        D.particle(ctx, p, p.t / p.life);
       }
       ctx.globalAlpha = 1;
       particles = particles.filter((p) => p.t < p.life);

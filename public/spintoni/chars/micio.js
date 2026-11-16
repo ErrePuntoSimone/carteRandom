@@ -8,6 +8,8 @@
   color: '#d7b899',
   desc: 'Gatto cavaliere con spada e scudo: solido e preciso.',
   stats: { speed: 510, jump: 1040, weight: 1.12, power: 1.1 },
+  // effetti visivi (solo grafica): fendenti d'argento, la speciale è un affondo con la spada
+  fx: { color: '#e0f7fa', glow: '#80deea', shape: 'slash', special: 'thrust' },
   moves: {
     special: {
       name: 'Affondo', desc: 'Scatta in avanti con la spada tesa: colpisce da lontano e spinge quasi in orizzontale.',

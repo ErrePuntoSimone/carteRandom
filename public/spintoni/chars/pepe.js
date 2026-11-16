@@ -8,6 +8,8 @@
   color: '#ff7043',
   desc: 'Leggerissimo e scattante: corre e salta più di tutti, ma vola via al primo colpo forte e picchia piano.',
   stats: { speed: 720, jump: 1200, weight: 0.75, power: 0.88 },
+  // effetti visivi (solo grafica): scintille arancio, la speciale è un vortice
+  fx: { color: '#ff7043', glow: '#ffd54f', shape: 'spark', special: 'vortex' },
   moves: {
     special: {
       name: 'Turbine', desc: 'Sale ruotando e colpisce chi gli sta intorno: perfetto per rientrare dal vuoto.',
