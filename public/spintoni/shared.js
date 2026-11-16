@@ -29,6 +29,7 @@
   const CHARS = {
     pepe: { name: 'Pepe', color: '#ff7043', desc: 'Leggero e scattante: corre e salta più di tutti, ma vola via prima.', speed: 610, jump: 1120, weight: 0.85, power: 0.92 },
     gilda: { name: 'Gilda', color: '#ab47bc', desc: 'Equilibrata: né troppo pesante né troppo leggera.', speed: 540, jump: 1060, weight: 1.0, power: 1.0 },
+    micio: { name: 'Micio', color: '#d7b899', desc: 'Gatto cavaliere con spada e scudo: solido e preciso.', speed: 520, jump: 1050, weight: 1.05, power: 1.05 },
     tonno: { name: 'Tonno', color: '#42a5f5', desc: 'Pesante e potente: lento, ma difficile da buttare fuori.', speed: 470, jump: 1000, weight: 1.25, power: 1.15 },
   };
 
