@@ -8,6 +8,7 @@ const { sendJson } = require('./lib/http');
 const carte = require('./games/carte/server');
 const poker = require('./games/poker/server');
 const briscola = require('./games/briscola/server');
+const arena = require('./games/arena/server');
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -17,6 +18,7 @@ const API = {
   carte: carte.handleApi,
   poker: poker.handleApi,
   briscola: briscola.handleApi,
+  arena: arena.handleApi,
 };
 
 const MIME = {
@@ -64,7 +66,7 @@ function serveStatic(res, pathname) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
-    if (url.pathname === '/healthz') return sendJson(res, 200, { ok: true, rooms: carte.rooms.size + poker.rooms.size + briscola.rooms.size });
+    if (url.pathname === '/healthz') return sendJson(res, 200, { ok: true, rooms: carte.rooms.size + poker.rooms.size + briscola.rooms.size + arena.rooms.size });
     if (url.pathname.startsWith('/api/')) {
       const [, game, ...parts] = url.pathname.split('/').filter(Boolean);
       const handler = API[game];
@@ -84,6 +86,19 @@ const server = http.createServer(async (req, res) => {
     if (status === 500) console.error(err);
     if (!res.headersSent) sendJson(res, status, { error: status === 500 ? 'Errore interno.' : err.message });
   }
+});
+
+// WebSocket per i giochi in tempo reale: /api/<gioco>/...
+const UPGRADE = {
+  arena: arena.handleUpgrade,
+};
+server.on('upgrade', (req, socket, head) => {
+  socket.on('error', () => {});
+  const url = new URL(req.url, 'http://localhost');
+  const [api, game, ...parts] = url.pathname.split('/').filter(Boolean);
+  const handler = api === 'api' && UPGRADE[game];
+  if (!handler) { socket.destroy(); return; }
+  try { handler(req, socket, head, url, parts); } catch (err) { console.error(err); socket.destroy(); }
 });
 
 if (require.main === module) {

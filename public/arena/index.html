@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0f5132">
+  <title>Rissa · Minigiochi</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💥</text></svg>">
+  <link rel="stylesheet" href="/common.css">
+  <link rel="stylesheet" href="/arena/style.css">
+</head>
+<body>
+  <main id="app">
+    <!-- HOME -->
+    <section id="screen-home" hidden>
+      <a class="back" href="/">← Menu</a>
+      <header class="hero">
+        <div class="logo">💥</div>
+        <h1>Rissa</h1>
+        <p class="sub">Arena d'azione in tempo reale: tutti contro tutti, vince chi fa più KO.</p>
+      </header>
+
+      <div class="panel who">
+        <span>Giochi come <strong id="who-name"></strong></span>
+        <a id="link-change" class="linkish" href="/">Cambia nome</a>
+      </div>
+
+      <div id="invite" class="panel invite" hidden>
+        <div class="invite-title">Sei stato invitato! 🎉</div>
+        <div class="invite-code" id="invite-code" aria-label="Codice"></div>
+        <button id="btn-join-invite" class="btn primary block cta" type="button">Entra nell'arena</button>
+        <p class="muted small center">Non volevi entrare in questa arena? <button id="btn-show-create" class="linkish small" type="button">crea una nuova arena</button></p>
+      </div>
+
+      <div id="home-main">
+        <div class="panel">
+          <button id="btn-create" class="btn primary block">Crea un'arena</button>
+        </div>
+        <form id="form-join" class="panel" autocomplete="off">
+          <label for="input-code">Hai un codice?</label>
+          <div class="row">
+            <input id="input-code" maxlength="5" placeholder="ABCDE" class="code-input" autocapitalize="characters" spellcheck="false">
+            <button class="btn" type="submit">Entra</button>
+          </div>
+        </form>
+      </div>
+      <p id="home-error" class="error" role="alert"></p>
+    </section>
+
+    <!-- SALA D'ATTESA -->
+    <section id="screen-lobby" hidden>
+      <header class="room-head">
+        <div>
+          <span class="muted small">Arena</span>
+          <div class="room-code" id="room-code">-----</div>
+        </div>
+        <div class="head-actions">
+          <button id="btn-share" class="btn small">Invita</button>
+          <button id="btn-leave" class="btn small ghost">Esci</button>
+        </div>
+      </header>
+      <div id="conn-banner" class="banner" hidden>Riconnessione…</div>
+
+      <div id="results" class="panel" hidden>
+        <h2 id="results-title">Classifica</h2>
+        <ol id="results-list" class="ranking"></ol>
+      </div>
+
+      <div class="panel">
+        <h2>Scegli il tuo lottatore</h2>
+        <div id="chars" class="chars"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Lottatori <span id="roster-count" class="pill"></span></h2>
+        <ul id="roster" class="roster"></ul>
+        <div id="host-bots" class="bot-row" hidden>
+          <button id="btn-add-bot" class="btn small">+ Aggiungi un bot</button>
+        </div>
+        <button id="btn-start" class="btn primary block">▶ Inizia la rissa</button>
+        <p id="start-hint" class="muted small center"></p>
+      </div>
+
+      <details class="panel">
+        <summary><h2>Come si gioca</h2></summary>
+        <ul class="howto">
+          <li><strong>Telefono</strong> (meglio in orizzontale): tieni il dito a sinistra per muoverti; a destra trascina per mirare e lascia per sparare, oppure tocca per la mira automatica.</li>
+          <li><strong>Computer</strong>: WASD o frecce per muoverti, mouse per mirare, clic per sparare, spazio o tasto destro per la super.</li>
+          <li>Hai 3 colpi che si ricaricano da soli. Colpire gli altri carica la <strong>super</strong>.</li>
+          <li>Nei <strong>cespugli</strong> gli altri non ti vedono, finché non attacchi o non si avvicinano.</li>
+          <li>Se non subisci colpi per un po', la vita si rigenera. Dopo un KO rientri in 3 secondi.</li>
+          <li>Partite da 2 minuti: vince chi fa più KO, o il primo che ne fa 10.</li>
+        </ul>
+      </details>
+      <p id="room-error" class="error center" role="alert"></p>
+    </section>
+  </main>
+
+  <!-- PARTITA -->
+  <section id="screen-game" class="game" hidden>
+    <canvas id="canvas"></canvas>
+    <div class="hud-top">
+      <button id="btn-quit" class="hud-btn" aria-label="Esci dalla partita">✕</button>
+      <div class="timer" id="timer">2:00</div>
+      <div class="board" id="board"></div>
+    </div>
+    <div class="feed" id="feed"></div>
+    <div class="dead" id="dead" hidden><div class="dead-title">KO!</div><div id="dead-text"></div></div>
+    <div class="rotate" id="rotate-hint">↻ Gira il telefono in orizzontale per vedere meglio</div>
+    <button id="btn-super" class="super" type="button" aria-label="Super"><span>SUPER</span></button>
+    <div class="desk-help" id="desk-help">WASD muovi · mouse mira · clic spara · spazio super</div>
+  </section>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/common.js"></script>
+  <script src="/arena/shared.js"></script>
+  <script src="/arena/draw.js"></script>
+  <script src="/arena/app.js"></script>
+</body>
+</html>
