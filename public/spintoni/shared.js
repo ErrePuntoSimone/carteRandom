@@ -70,7 +70,7 @@
       moves[ty] = { ...(base || {}), ...(own || {}) };
       moves[ty].boxes = { ...((base && base.boxes) || {}), ...((own && own.boxes) || {}) };
     }
-    CHARS[def.id] = { ...def.stats, name: def.name, color: def.color, desc: def.desc, moves, hooks: def.hooks || {} };
+    CHARS[def.id] = { ...def.stats, name: def.name, color: def.color, desc: def.desc, moves, hooks: def.hooks || {}, fx: { color: def.color, glow: '#ffffff', shape: 'dot', ...(def.fx || {}) } };
   }
   const charDefs = typeof module !== 'undefined' && module.exports
     ? require('./chars/index.json').map((id) => require(`./chars/${id}.js`))
