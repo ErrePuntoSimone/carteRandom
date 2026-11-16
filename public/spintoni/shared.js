@@ -108,9 +108,13 @@
       x, y, vx: 0, vy: 0, face: 1, g: false, onPlat: false, jumps: PHYS.airJumps,
       att: null, attN: 0, buf: null, hs: 0, dg: 0, dgDir: 0, dodgeCd: 0, spCd: 0, inv: 0, drop: 0, coyote: 0, jbuf: 0,
       char: CHARS[char] ? char : DEFAULT_CHAR,
-      mt: null,
+      mt: null, ht: null, spArm: null,
     };
-    if (CHARS[f.char].specials) f.mt = { light: 0, heavy: 0, dodge: 0, special: 0 };
+    if (CHARS[f.char].specials) {
+      f.mt = { light: 0, heavy: 0, dodge: 0, special: 0 };
+      f.ht = { light: 0, heavy: 0, dodge: 0, special: 0 }; // secondi di pressione continua
+      f.spArm = { light: true, heavy: true, dodge: true, special: true }; // questa pressione può ancora far partire la speciale
+    }
     return f;
   }
 
@@ -121,6 +125,8 @@
     for (const k of FIELDS) o[k] = f[k];
     o.att = f.att ? { ty: f.att.ty, dir: f.att.dir, t: f.att.t, air: f.att.air, id: f.att.id, c: f.att.c, rel: f.att.rel } : null;
     o.mt = f.mt ? { ...f.mt } : null;
+    o.ht = f.ht ? { ...f.ht } : null;
+    o.spArm = f.spArm ? { ...f.spArm } : null;
     o.buf = f.buf ? { ty: f.buf.ty, t: f.buf.t } : null;
     return o;
   }
@@ -190,7 +196,8 @@
 
   /**
    * Un passo di fisica.
-   * inp: { mx (-1..1), up, down, hd (tenuti premuti), j, l, h, sp, d, dd (premuti in questo passo) }
+   * inp: { mx (-1..1), up, down, hd, hb (tenuti premuti; hb: 1 Basico, 2 Potenziato, 4 Schiva, 8 Speciale),
+   *        j, l, h, sp, d, dd, ul (premuti in questo passo) }
    */
   function stepFighter(f, inp, dt = TICK) {
     const ch = CHARS[f.char];
@@ -228,6 +235,7 @@
     // la schivata interrompe la carica
     if (f.att && !f.att.rel && f.att.c > 0 && inp.d && f.dodgeCd <= 0) f.att = null;
     if (f.dg > 0) f.dg = Math.max(0, f.dg - dt);
+    if (f.mt) holdSpecials(f, inp, dt);
     if (inp.l) f.buf = { ty: 'light', t: PHYS.buffer };
     if (inp.h) f.buf = { ty: 'heavy', t: PHYS.buffer };
     if (inp.sp && f.spCd <= 0 && CHARS[f.char].moves.special) f.buf = { ty: 'special', t: PHYS.buffer };
@@ -311,8 +319,38 @@
     if (inp.down && !f.g && f.vy > 0) f.vy = Math.max(f.vy, PHYS.fastFall * 0.75);
     const x0 = f.x, y0 = f.y;
     integrate(f, dt, true);
-    addMeter(f, Math.hypot(f.x - x0, f.y - y0) / PHYS.meterDist * ch.meter.move);
+    // le speciali che spostano (scatti, affondi) non ricaricano le barre che hanno appena svuotato
+    if (!(f.att && f.att.ty.startsWith('sp:'))) addMeter(f, Math.hypot(f.x - x0, f.y - y0) / PHYS.meterDist * ch.meter.move);
     return f;
+  }
+
+  // Tocco e tenuto: il tocco ha già fatto partire la mossa base; tenendo oltre holdSpecial con la barra piena
+  // parte la speciale al suo posto. Una barra riempita a pressione già lunga aspetta la pressione successiva.
+  function holdSpecials(f, inp, dt) {
+    const hb = inp.hb | 0;
+    SLOTS.forEach((slot, i) => {
+      if (!(hb & (1 << i))) { f.ht[slot] = 0; f.spArm[slot] = true; return; }
+      const prev = f.ht[slot];
+      f.ht[slot] += dt;
+      if (prev > PHYS.holdSpecial || f.ht[slot] <= PHYS.holdSpecial) return;
+      // Potenziato tenuto da solo resta il pugno caricato: la sua speciale vuole anche giù
+      if (f.spArm[slot] && meterFull(f, slot) && (slot !== 'heavy' || inp.down)) {
+        f.mt[slot] = 0;
+        startSpecial(f, 'sp:' + slot);
+      }
+      f.spArm[slot] = false;
+    });
+    if (inp.ul && SLOTS.every((k) => meterFull(f, k))) {
+      for (const k of SLOTS) f.mt[k] = 0;
+      startSpecial(f, 'sp:ultimate');
+    }
+  }
+  // la speciale interrompe la mossa base o la schivata in corso
+  function startSpecial(f, ty) {
+    f.attN += 1;
+    f.att = { ty, dir: 'side', t: 0, air: !f.g, id: f.attN, c: 0, rel: true };
+    f.dg = 0;
+    f.buf = null;
   }
 
   function integrate(f, dt) {

@@ -62,6 +62,7 @@ class Sim {
     f.queue.push({
       s, mx: Math.max(-1, Math.min(1, Number(m.mx) || 0)), up: !!m.up, down: !!m.dn,
       j: !!m.j, l: !!m.l, h: !!m.h, sp: !!m.sp, hd: !!m.hd, d: !!m.d, dd: !!m.dd,
+      hb: Number.isInteger(Number(m.hb)) && m.hb >= 0 && m.hb <= 15 ? Number(m.hb) : 0, ul: !!m.ul,
     });
     if (f.queue.length > 10) f.queue.splice(0, f.queue.length - 10);
   }
@@ -96,7 +97,7 @@ class Sim {
         for (let k = 0; k < n; k++) {
           const inp = f.queue.shift();
           f.seq = inp.s;
-          f.held = { mx: inp.mx, up: inp.up, down: inp.down, hd: inp.hd };
+          f.held = { mx: inp.mx, up: inp.up, down: inp.down, hd: inp.hd, hb: inp.hb };
           S.stepFighter(f, inp, dt);
         }
       }

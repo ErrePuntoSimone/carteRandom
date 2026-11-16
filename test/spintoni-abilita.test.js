@@ -48,3 +48,102 @@ test('abilità: in volo dopo un colpo non si carica', () => {
   for (let i = 0; i < 5; i++) S.stepFighter(f, idle);
   assert.deepStrictEqual(f.mt, { light: 0, heavy: 0, dodge: 0, special: 0 });
 });
+
+// tocco e tenuto: lottatore a terra, fermo
+const ground = (char = 'test_ab') => { const f = S.newFighter(700, S.STAGE.main.y, char); f.g = true; return f; };
+const hold = (f, inp, n) => { for (let i = 0; i < n; i++) S.stepFighter(f, { ...idle, ...inp }); };
+const isSp = (f) => !!f.att && f.att.ty.startsWith('sp:');
+
+test('tenuto: il tocco parte subito anche con la barra piena', () => {
+  const f = ground(); S.addMeter(f, 100);
+  S.stepFighter(f, { ...idle, l: true, hb: 1 });
+  assert.strictEqual(f.att.ty, 'light');
+});
+
+test('tenuto: oltre holdSpecial parte la speciale e svuota la barra', () => {
+  const f = ground(); S.addMeter(f, 100);
+  S.stepFighter(f, { ...idle, l: true, hb: 1 });
+  hold(f, { hb: 1 }, 11);
+  assert.strictEqual(f.att.ty, 'sp:light');
+  assert.deepStrictEqual(f.mt, { light: 0, heavy: 4, dodge: 3, special: 5 });
+});
+
+test('tenuto: con la barra non piena resta la mossa base', () => {
+  const f = ground();
+  S.stepFighter(f, { ...idle, l: true, hb: 1 });
+  hold(f, { hb: 1 }, 11);
+  assert.ok(!isSp(f));
+});
+
+test('tenuto: barra che si riempie a pressione già lunga non fa partire nulla', () => {
+  const f = ground();
+  hold(f, { hb: 1 }, 15);
+  S.addMeter(f, 100);
+  hold(f, { hb: 1 }, 5);
+  assert.ok(!isSp(f));
+  hold(f, { hb: 0 }, 1);
+  hold(f, { hb: 1 }, 12);
+  assert.strictEqual(f.att.ty, 'sp:light');
+});
+
+test('tenuto: Potenziato senza giù resta il pugno caricato', () => {
+  const f = ground(); S.addMeter(f, 100);
+  S.stepFighter(f, { ...idle, h: true, hb: 2, hd: true });
+  hold(f, { hb: 2, hd: true }, 20);
+  assert.strictEqual(f.att.ty, 'heavy');
+  assert.ok(f.att.c > 0);
+});
+
+test('tenuto: Potenziato + giù fa la speciale', () => {
+  const f = ground(); S.addMeter(f, 100);
+  S.stepFighter(f, { ...idle, h: true, hb: 2, hd: true, down: true });
+  hold(f, { hb: 2, hd: true, down: true }, 11); // la speciale finta dura 0,3 s: si guarda appena partita
+  assert.strictEqual(f.att.ty, 'sp:heavy');
+});
+
+test('tenuto: Schiva tenuta interrompe la schivata', () => {
+  const f = ground(); S.addMeter(f, 100);
+  S.stepFighter(f, { ...idle, d: true, hb: 4 });
+  assert.ok(f.dg > 0);
+  hold(f, { d: true, hb: 4 }, 11);
+  assert.strictEqual(f.att.ty, 'sp:dodge');
+  assert.strictEqual(f.dg, 0);
+});
+
+test('suprema: serve avere 4 barre piene e le svuota tutte', () => {
+  const f = ground(); S.addMeter(f, 100); f.mt.special = 0;
+  S.stepFighter(f, { ...idle, ul: true });
+  assert.strictEqual(f.att, null);
+  S.addMeter(f, 100);
+  S.stepFighter(f, { ...idle, ul: true });
+  assert.strictEqual(f.att.ty, 'sp:ultimate');
+  assert.deepStrictEqual(f.mt, { light: 0, heavy: 0, dodge: 0, special: 0 });
+});
+
+test('suprema: ignorata in volo dopo un colpo', () => {
+  const f = ground(); S.addMeter(f, 100); f.hs = 0.3;
+  S.stepFighter(f, { ...idle, ul: true });
+  assert.strictEqual(f.att, null);
+  assert.deepStrictEqual(f.mt, { light: 2, heavy: 4, dodge: 3, special: 5 });
+});
+
+test('tenuto: personaggi senza specials ignorano hb e ul', () => {
+  const a = ground('gilda'), b = ground('gilda');
+  S.stepFighter(a, { ...idle, l: true, hb: 15, ul: true });
+  S.stepFighter(b, { ...idle, l: true });
+  hold(a, { hb: 15, ul: true, hd: true }, 15);
+  hold(b, { hd: true }, 15);
+  assert.ok(!isSp(a));
+  assert.deepStrictEqual(S.physState(a), S.physState(b));
+});
+
+test('tenuto: pushInput valida hb e ul', () => {
+  const { Sim } = require('../games/spintoni/sim');
+  const sim = new Sim({ players: [{ id: 'a', name: 'A', char: 'test_ab' }] });
+  const f = sim.fighters.get('a');
+  sim.pushInput('a', { s: 1, hb: 5, ul: 1 });
+  sim.pushInput('a', { s: 2, hb: 16, ul: 0 });
+  sim.pushInput('a', { s: 3, hb: 1.5 });
+  sim.pushInput('a', { s: 4, hb: '3' });
+  assert.deepStrictEqual(f.queue.map((q) => [q.hb, q.ul]), [[5, true], [0, false], [0, false], [3, false]]);
+});
