@@ -98,7 +98,7 @@ un'isola galleggiante e tre piattaforme sospese. Lo scopo è buttare fuori dallo
   l'alto o in aria) senza mai cadere dall'isola; appena lasciato un bordo si può ancora **saltare da terra** (tolleranza
   di 0,1 s); un salto premuto poco prima di atterrare **parte da solo**; durante il **recupero** di un colpo si può
   **annullare saltando**. Sono nel codice condiviso (`public/spintoni/shared.js`), quindi vale uguale per server e telefono.
-- **Lottatori:** *Pepe* (leggero e veloce), *Gilda* (equilibrata), *Tonno* (pesante e potente) e *Micio*
+- **Lottatori:** *Pepe* (leggerissimo e velocissimo, picchia piano), *Gilda* (equilibrata), *Tonno* (massiccio e lentissimo, picchia durissimo) e *Micio*
   (gatto cavaliere con spada e scudo, solido e preciso).
 - **Colore dei dettagli:** nella sala d'attesa ognuno sceglie un colore (o i colori originali) che si applica a pochi
   dettagli del personaggio: polsini dei guantoni, strisce delle scarpe, fibbia, e la bandana di Pepe, la stella e il
