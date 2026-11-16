@@ -47,6 +47,10 @@ for (const id of Object.keys(S.CHARS)) {
         assert.ok(a.phases.every((n) => n >= 1));
       }
     }
+    // l'animazione scelta da ogni mossa del personaggio esiste nello sprite
+    for (const [ty, m] of Object.entries(S.CHARS[id].moves)) {
+      if (m.anim) assert.ok(meta.anims[m.anim], `${ty}: animazione ${m.anim} mancante`);
+    }
   });
 }
 

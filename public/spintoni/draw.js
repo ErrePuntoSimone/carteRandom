@@ -1,7 +1,7 @@
 'use strict';
 // Disegno di "Spintoni" su canvas: sfondo, isola, piattaforme e lottatori con i guantoni.
 window.SpintoniDraw = (() => {
-  const { STAGE, CHARS, MOVES, PHYS } = window.SpintoniShared;
+  const { STAGE, CHARS, PHYS, moveOf } = window.SpintoniShared;
   const TAU = Math.PI * 2;
   const SLOT_COLORS = ['#ff5252', '#448aff', '#69f0ae', '#ffd740'];
 
@@ -142,16 +142,40 @@ window.SpintoniDraw = (() => {
    */
   function fighter(ctx, x, y, st, slot, now, opts = {}) {
     chargeAura(ctx, x, y, st, now);
+    moveAura(ctx, x, y, st, now);
     const spr = window.SpintoniSprites && window.SpintoniSprites.get(st.c);
     if (spr) { spriteFighter(ctx, x, y, st, now, spr, opts.color); nameTag(ctx, x, y, slot, opts); }
     else vectorFighter(ctx, x, y, st, slot, now, opts);
     chargeBar(ctx, x, y, st, now);
   }
 
+  // Finestre speciali della mossa in corso: parata (scudo azzurro) e corazza (alone arancio).
+  function moveAura(ctx, x, y, st, now) {
+    if (!st.a) return;
+    const m = moveOf(st.c, st.a.ty);
+    const inW = (w) => w && st.a.t >= w.from && st.a.t < w.to;
+    if (inW(m.counter)) {
+      const pulse = 0.5 + 0.5 * Math.sin(now / 60);
+      ctx.save();
+      ctx.strokeStyle = `rgba(128, 222, 234, ${0.55 + 0.35 * pulse})`;
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(x, y - PHYS.h / 2, 58 + 4 * pulse, 0, TAU); ctx.stroke();
+      ctx.fillStyle = 'rgba(128, 222, 234, .12)'; ctx.fill();
+      ctx.restore();
+    }
+    if (inW(m.armor)) {
+      ctx.save();
+      const gr = ctx.createRadialGradient(x, y - PHYS.h / 2, 10, x, y - PHYS.h / 2, 80);
+      gr.addColorStop(0, 'rgba(255, 152, 0, .35)'); gr.addColorStop(1, 'rgba(255, 152, 0, 0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y - PHYS.h / 2, 80, 0, TAU); ctx.fill();
+      ctx.restore();
+    }
+  }
+
   // Carica del pugno forte: 0..1, oppure 0 se non sta caricando.
   function chargeOf(st) {
     const a = st.a;
-    if (!a || a.ty !== 'heavy' || a.rel || !(a.c > 0.02)) return 0;
+    if (!a || a.rel || !(a.c > 0.02)) return 0;
     return Math.min(1, a.c / PHYS.chargeMax);
   }
 
@@ -282,13 +306,13 @@ window.SpintoniDraw = (() => {
     let front = { x: 18, y: shY + 6 }, back = { x: -6, y: shY + 2 };
     let lines = 0;
     if (st.a) {
-      const m = MOVES[st.a.ty];
+      const m = moveOf(st.c, st.a.ty);
       const t = st.a.t;
-      const heavy = st.a.ty === 'heavy';
+      const heavy = st.a.ty !== 'light';
       let k; // 0 = caricato, 1 = disteso
       if (t < m.startup) k = -(t / m.startup);
       else if (t < m.startup + m.active) { k = 1; lines = heavy ? 2 : 1; }
-      else k = 1 - (t - m.startup - m.active) / m.recovery;
+      else k = Math.max(0, 1 - (t - m.startup - m.active) / m.recovery);
       const reach = heavy ? 64 : 52;
       const pull = heavy ? 22 : 8;
       const ext = k >= 0 ? k * reach : k * pull;

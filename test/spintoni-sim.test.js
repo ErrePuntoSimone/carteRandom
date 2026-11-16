@@ -255,7 +255,7 @@ test('un tocco veloce sul forte non ha ritardo: parte come prima', () => {
     const f = onIsland(800);
     let n = 0;
     S.stepFighter(f, { ...idleInp, h: true, hd: heldInput });
-    while (f.att && !S.isActive(f.att) && n < 60) { S.stepFighter(f, idleInp); n++; }
+    while (f.att && !S.isActive(f) && n < 60) { S.stepFighter(f, idleInp); n++; }
     return n;
   };
   const tap = frames(false);

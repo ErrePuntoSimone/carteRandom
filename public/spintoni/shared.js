@@ -29,16 +29,15 @@
     coyote: 0.1, jumpBuffer: 0.12, // salto ancora possibile appena lasciato il bordo / salto premuto poco prima di atterrare
   };
 
-  // Lottatori originali: stessa mossa base, peso e potenza diversi.
-  const CHARS = {
-    pepe: { name: 'Pepe', color: '#ff7043', desc: 'Leggerissimo e scattante: corre e salta più di tutti, ma vola via al primo colpo forte e picchia piano.', speed: 720, jump: 1200, weight: 0.75, power: 0.88 },
-    gilda: { name: 'Gilda', color: '#ab47bc', desc: 'Equilibrata: né troppo pesante né troppo leggera.', speed: 560, jump: 1070, weight: 1.0, power: 1.0 },
-    micio: { name: 'Micio', color: '#d7b899', desc: 'Gatto cavaliere con spada e scudo: solido e preciso.', speed: 510, jump: 1040, weight: 1.12, power: 1.1 },
-    tonno: { name: 'Tonno', color: '#42a5f5', desc: 'Massiccio e potente: lentissimo e con salti bassi, ma quasi impossibile da buttare fuori e picchia durissimo.', speed: 390, jump: 980, weight: 1.45, power: 1.28 },
-  };
-
-  // Attacchi: tempi (s), danno (%), forza del lancio e zone di colpo per direzione.
+  // Mosse di base, comuni a tutti i lottatori (ognuno può sostituirle in parte nel suo file in chars/).
+  // Tempi (s), danno (%), forza del lancio e zone di colpo per direzione.
   // ang: angolo del lancio in gradi rispetto all'avanti (90 = verso l'alto, negativo = verso il basso).
+  // Campi facoltativi di una mossa (tutti gestiti dal motore, vedi README "Creare un personaggio"):
+  //   chargeable  si carica tenendo premuto           lunge      passo in avanti {speed, time}
+  //   motion      spinte durante la mossa [{from, to, vx, vy, edgeStop}]   keepOnLand  in aria non si interrompe atterrando
+  //   armor       corazza {from, to}: i colpi fanno danno ma non lanciano
+  //   counter     parata {from, to, dmg, base, growth, ang}: se colpito in quel momento risponde
+  //   cooldown    tempo di ricarica (speciale)         anim       animazione dello sprite da usare
   const MOVES = {
     light: {
       startup: 0.05, active: 0.08, recovery: 0.13, dmg: 5, base: 320, growth: 7,
@@ -50,7 +49,7 @@
       },
     },
     heavy: {
-      startup: 0.2, active: 0.1, recovery: 0.28, dmg: 12, base: 470, growth: 13,
+      startup: 0.2, active: 0.1, recovery: 0.28, dmg: 12, base: 470, growth: 13, chargeable: true,
       lunge: { speed: 280, time: 0.18 },
       boxes: {
         side: { x: 26, y: -76, w: 88, h: 54, ang: 38 },
@@ -60,19 +59,39 @@
     },
   };
 
+  // ---------- lottatori: uno per file in public/spintoni/chars/ (elenco e ordine in chars/index.json) ----------
+  const ATTACKS = ['light', 'heavy', 'special'];
+  const CHARS = {};
+  function registerChar(def) {
+    const moves = {};
+    for (const ty of ATTACKS) {
+      const base = MOVES[ty] || null, own = (def.moves || {})[ty] || null;
+      if (!base && !own) continue;
+      moves[ty] = { ...(base || {}), ...(own || {}) };
+      moves[ty].boxes = { ...((base && base.boxes) || {}), ...((own && own.boxes) || {}) };
+    }
+    CHARS[def.id] = { ...def.stats, name: def.name, color: def.color, desc: def.desc, moves, hooks: def.hooks || {} };
+  }
+  const charDefs = typeof module !== 'undefined' && module.exports
+    ? require('./chars/index.json').map((id) => require(`./chars/${id}.js`))
+    : root.SpintoniCharDefs || [];
+  for (const d of charDefs) registerChar(d);
+  const DEFAULT_CHAR = CHARS.gilda ? 'gilda' : Object.keys(CHARS)[0];
+  const moveOf = (char, ty) => ((CHARS[char] || CHARS[DEFAULT_CHAR]).moves[ty]) || MOVES.light;
+
   const sign = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
   const approach = (v, target, step) => (v < target ? Math.min(target, v + step) : Math.max(target, v - step));
 
   function newFighter(x, y, char) {
     return {
       x, y, vx: 0, vy: 0, face: 1, g: false, onPlat: false, jumps: PHYS.airJumps,
-      att: null, attN: 0, buf: null, hs: 0, dg: 0, dgDir: 0, dodgeCd: 0, inv: 0, drop: 0, coyote: 0, jbuf: 0,
-      char: CHARS[char] ? char : 'gilda',
+      att: null, attN: 0, buf: null, hs: 0, dg: 0, dgDir: 0, dodgeCd: 0, spCd: 0, inv: 0, drop: 0, coyote: 0, jbuf: 0,
+      char: CHARS[char] ? char : DEFAULT_CHAR,
     };
   }
 
   // Copia solo i campi di fisica (per la previsione sul telefono).
-  const FIELDS = ['x', 'y', 'vx', 'vy', 'face', 'g', 'onPlat', 'jumps', 'attN', 'hs', 'dg', 'dgDir', 'dodgeCd', 'inv', 'drop', 'coyote', 'jbuf', 'char'];
+  const FIELDS = ['x', 'y', 'vx', 'vy', 'face', 'g', 'onPlat', 'jumps', 'attN', 'hs', 'dg', 'dgDir', 'dodgeCd', 'spCd', 'inv', 'drop', 'coyote', 'jbuf', 'char'];
   function physState(f) {
     const o = {};
     for (const k of FIELDS) o[k] = f[k];
@@ -83,17 +102,25 @@
 
   const moveTotal = (m) => m.startup + m.active + m.recovery;
   // durata complessiva di un attacco in corso: il forte caricato resta fermo di più, in proporzione alla carica
-  const attackTotal = (a) => moveTotal(MOVES[a.ty]) + chargeFrac(a) * PHYS.chargeRecovery;
-  const isActive = (att) => {
+  const attackTotal = (f) => moveTotal(moveOf(f.char, f.att.ty)) + chargeFrac(f.att) * PHYS.chargeRecovery;
+  const isActive = (f) => {
+    const att = f.att;
     if (!att) return false;
-    const m = MOVES[att.ty];
+    const m = moveOf(f.char, att.ty);
     return att.t >= m.startup && att.t < m.startup + m.active;
+  };
+  // la mossa in corso è in una sua finestra (armor, counter...)?
+  const inWindow = (f, key) => {
+    if (!f.att) return null;
+    const w = moveOf(f.char, f.att.ty)[key];
+    return w && f.att.t >= w.from && f.att.t < w.to ? w : null;
   };
 
   // Zona di colpo dell'attacco in corso (coordinate del mondo), o null.
   function hitbox(f) {
-    if (!isActive(f.att)) return null;
-    const b = MOVES[f.att.ty].boxes[f.att.dir];
+    if (!isActive(f)) return null;
+    const b = moveOf(f.char, f.att.ty).boxes[f.att.dir];
+    if (!b) return null;
     const x = f.face > 0 ? f.x + b.x : f.x - b.x - b.w;
     return { x, y: f.y + b.y, w: b.w, h: b.h };
   }
@@ -108,12 +135,12 @@
   function lungeVelocity(f) {
     const a = f.att;
     if (!a) return 0;
-    const m = MOVES[a.ty];
+    const m = moveOf(f.char, a.ty);
     const lg = m.lunge;
     if (!lg) return 0;
     // il forte avanza quando parte il colpo (non mentre si prepara o si carica)
-    if (a.ty === 'heavy' && !a.rel) return 0;
-    const lt = a.ty === 'heavy' ? a.t - m.startup + 0.001 : a.t;
+    if (m.chargeable && !a.rel) return 0;
+    const lt = m.chargeable ? a.t - m.startup + 0.001 : a.t;
     if (lt < 0 || lt >= lg.time) return 0;
     const mult = a.dir === 'side' ? 1 : a.dir === 'down' ? 0.6 : 0.35;
     return f.face * lg.speed * mult * (a.air ? 0.5 : 1) * (1 + 0.6 * chargeFrac(a)) * (1 - 0.6 * (lt / lg.time));
@@ -127,15 +154,25 @@
     return [STAGE.main.x, STAGE.main.x + STAGE.main.w];
   }
 
+  // Spinta della mossa in corso in questo istante (motion), o null.
+  function motionNow(f) {
+    if (!f.att) return null;
+    const m = moveOf(f.char, f.att.ty);
+    if (!m.motion) return null;
+    for (const mo of m.motion) if (f.att.t >= mo.from && f.att.t < mo.to) return mo;
+    return null;
+  }
+
   /**
    * Un passo di fisica.
-   * inp: { mx (-1..1), up, down (tenuti premuti), j, l, h, d, dd (premuti in questo passo) }
+   * inp: { mx (-1..1), up, down, hd (tenuti premuti), j, l, h, sp, d, dd (premuti in questo passo) }
    */
   function stepFighter(f, inp, dt = TICK) {
     const ch = CHARS[f.char];
     const mx = Math.max(-1, Math.min(1, Number(inp.mx) || 0));
     f.inv = Math.max(0, f.inv - dt);
     f.dodgeCd = Math.max(0, f.dodgeCd - dt);
+    f.spCd = Math.max(0, (f.spCd || 0) - dt);
     f.drop = Math.max(0, f.drop - dt);
 
     if (f.hs > 0) {
@@ -155,27 +192,31 @@
     f.jbuf = inp.j ? PHYS.jumpBuffer : Math.max(0, f.jbuf - dt);
 
     if (f.att) {
-      const a = f.att, m = MOVES[a.ty];
-      if (a.ty === 'heavy' && !a.rel && a.t + dt >= m.startup) {
+      const a = f.att, m = moveOf(f.char, a.ty);
+      if (m.chargeable && !a.rel && a.t + dt >= m.startup) {
         // fine della preparazione: se il tasto è ancora premuto si carica (al massimo chargeMax secondi), poi parte
         if (inp.hd && a.c < PHYS.chargeMax) { a.c = Math.min(PHYS.chargeMax, a.c + dt); a.t = m.startup - 0.001; }
         else { a.rel = true; a.t += dt; }
       } else a.t += dt;
-      if (a.t >= attackTotal(a)) f.att = null;
+      if (a.t >= attackTotal(f)) f.att = null;
     }
     // la schivata interrompe la carica
-    if (f.att && f.att.ty === 'heavy' && !f.att.rel && f.att.c > 0 && inp.d && f.dodgeCd <= 0) f.att = null;
+    if (f.att && !f.att.rel && f.att.c > 0 && inp.d && f.dodgeCd <= 0) f.att = null;
     if (f.dg > 0) f.dg = Math.max(0, f.dg - dt);
     if (inp.l) f.buf = { ty: 'light', t: PHYS.buffer };
     if (inp.h) f.buf = { ty: 'heavy', t: PHYS.buffer };
+    if (inp.sp && f.spCd <= 0 && CHARS[f.char].moves.special) f.buf = { ty: 'special', t: PHYS.buffer };
     if (f.buf) { f.buf.t -= dt; if (f.buf.t <= 0) f.buf = null; }
 
     const free = !f.att && f.dg <= 0;
     if (free && f.buf) {
-      const dir = inp.up ? 'up' : inp.down ? 'down' : 'side';
+      const m = moveOf(f.char, f.buf.ty);
+      let dir = inp.up ? 'up' : inp.down ? 'down' : 'side';
+      if (!m.boxes[dir]) dir = 'side'; // mosse senza varianti per direzione
       if (Math.abs(mx) > 0.3) f.face = sign(mx);
       f.attN += 1;
-      f.att = { ty: f.buf.ty, dir, t: 0, air: !f.g, id: f.attN, c: 0, rel: f.buf.ty !== 'heavy' };
+      f.att = { ty: f.buf.ty, dir, t: 0, air: !f.g, id: f.attN, c: 0, rel: !m.chargeable };
+      if (m.cooldown) f.spCd = m.cooldown;
       f.buf = null;
     } else if (free && inp.d && f.dodgeCd <= 0) {
       f.dg = PHYS.dodgeTime;
@@ -205,11 +246,26 @@
           f.vx = Math.max(-ch.speed * 1.2, Math.min(ch.speed * 1.2, f.vx + lg * 0.3));
         }
       }
+      // spinte proprie della mossa (scatti, salite): a terra con edgeStop non si esce dalla superficie
+      const mo = motionNow(f);
+      if (mo) {
+        if (mo.vx !== undefined) {
+          let vx = f.face * mo.vx;
+          if (f.g && mo.edgeStop) {
+            const [lo, hi] = supportRange(f);
+            const nx = f.x + vx * dt;
+            if (nx < lo + 10 || nx > hi - 10) vx = 0;
+          }
+          f.vx = vx;
+        }
+        if (mo.vy !== undefined) { f.vy = mo.vy - PHYS.g * dt; if (mo.vy < 0) f.g = false; }
+      }
     }
 
     // salto e doppio salto; durante il recupero di un colpo si può annullare saltando
     // dopo il colpo si può annullare con un salto, ma non se era caricato: quella pausa va scontata
-    const recovering = f.att && !(f.att.c > 0) && f.att.t >= MOVES[f.att.ty].startup + MOVES[f.att.ty].active;
+    const curMove = f.att && moveOf(f.char, f.att.ty);
+    const recovering = f.att && !(f.att.c > 0) && !curMove.cooldown && f.att.t >= curMove.startup + curMove.active;
     if (f.jbuf > 0 && (!f.att || recovering) && f.dg <= 0) {
       if (f.g || f.coyote > 0) {
         // da terra, o appena lasciato il bordo (o salto premuto poco prima di atterrare)
@@ -262,7 +318,8 @@
         }
       }
     }
-    if (!wasG && f.g && f.att && f.att.air) f.att = null; // atterrando si interrompe l'attacco in aria
+    // atterrando si interrompe l'attacco in aria (salvo mosse che lo prevedono)
+    if (!wasG && f.g && f.att && f.att.air && !moveOf(f.char, f.att.ty).keepOnLand) f.att = null;
   }
 
   function land(f, y) {
@@ -290,7 +347,10 @@
   ];
   const colorHex = (id) => (COLORS.find((c) => c.id === id) || {}).hex || null;
 
-  const api = { TICK, STAGE, PHYS, CHARS, MOVES, COLORS, colorHex, newFighter, physState, stepFighter, hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds, lungeVelocity, chargeFrac, attackTotal };
+  const api = {
+    TICK, STAGE, PHYS, CHARS, MOVES, ATTACKS, COLORS, colorHex, registerChar, moveOf, inWindow, newFighter, physState, stepFighter,
+    hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds, lungeVelocity, chargeFrac, attackTotal,
+  };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SpintoniShared = api;
 })(typeof self !== 'undefined' ? self : this);
