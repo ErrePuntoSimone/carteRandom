@@ -54,6 +54,7 @@ const manager = createRoomManager({
         bots: g.bots.map((b) => ({ id: b.id, name: b.name, char: b.char })),
         results: g.results,
         max: MAX_FIGHTERS,
+        cd: g.phase === 'playing' && g.sim ? g.sim.cd : 0,
       },
     };
   },
