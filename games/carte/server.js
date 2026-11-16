@@ -58,6 +58,7 @@ function publicState(room, viewerId) {
   return {
     code: room.code,
     hostId: room.hostId,
+    public: !!room.public,
     you: viewerId,
     deckId: room.deckId,
     customCards: room.customCards,
@@ -125,6 +126,16 @@ async function handleApi(req, res, url, parts) {
 
   if (req.method === 'GET' && parts[0] === 'decks') {
     return sendJson(res, 200, Object.entries(DECKS).map(([id, d]) => ({ id, name: d.name, size: d.size })));
+  }
+
+  if (req.method === 'GET' && parts.length === 1 && parts[0] === 'rooms') {
+    const list = [];
+    for (const room of rooms.values()) {
+      if (!room.public || room.players.size >= MAX_PLAYERS) continue;
+      const host = room.players.get(room.hostId);
+      list.push({ code: room.code, host: host ? host.name : '', players: room.players.size, max: MAX_PLAYERS, label: '' });
+    }
+    return sendJson(res, 200, list.slice(0, 50));
   }
 
   if (req.method === 'POST' && parts.length === 1 && parts[0] === 'rooms') {
@@ -196,6 +207,13 @@ async function handleApi(req, res, url, parts) {
       }
       broadcast(room);
       return sendJson(res, 200, { ok: true });
+    }
+    case 'visibility': {
+      const p = auth(room, body);
+      requireHost(room, p);
+      room.public = !!body.public;
+      broadcast(room);
+      return sendJson(res, 200, { ok: true, public: room.public });
     }
     case 'deal': {
       const p = auth(room, body);

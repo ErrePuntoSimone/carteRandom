@@ -9,6 +9,7 @@ const trickDelay = () => Number(process.env.BRISCOLA_TRICK_MS) || 1600;
 
 const manager = createRoomManager({
   maxPlayers: 4,
+  listInfo(room) { return { max: room.game.mode, label: room.game.mode === 4 ? 'A coppie (4)' : 'Sfida (2)' }; },
   createGame(host, room, body) {
     const g = B.createGame(Number(body && body.mode) === 4 ? 4 : 2);
     B.addPlayer(g, host.id, host.name);

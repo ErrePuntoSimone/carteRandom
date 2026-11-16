@@ -21,6 +21,7 @@ function stopMatch(g) {
 
 const manager = createRoomManager({
   maxPlayers: MAX_FIGHTERS,
+  listInfo() { return { max: MAX_FIGHTERS, label: 'In attesa' }; },
   createGame(host) {
     return { phase: 'lobby', picks: { [host.id]: 'gilda' }, colors: {}, bots: [], sim: null, loop: null, results: null, matchNo: 0, sockets: new Map(), stocks: 3 };
   },

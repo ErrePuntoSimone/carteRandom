@@ -111,6 +111,7 @@
   }
 
   function render(state) {
+    if (session) PublicRoom.update('spintoni', state, session);
     R = state;
     const g = R.game;
     if (g.phase === 'playing') Game.start(g.matchNo);

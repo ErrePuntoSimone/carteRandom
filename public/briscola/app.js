@@ -104,6 +104,7 @@
   const isHost = () => S.hostId === S.you;
 
   function render(state) {
+    if (session) PublicRoom.update('briscola', state, session);
     S = state;
     const g = S.game;
     const playing = g.phase === 'playing' || g.phase === 'trick';

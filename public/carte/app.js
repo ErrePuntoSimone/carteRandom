@@ -133,6 +133,7 @@
   }
 
   function render(s) {
+    if (session) PublicRoom.update('carte', s, session);
     state = s;
     const me = s.players.find((p) => p.id === s.you);
     const isHost = s.hostId === s.you;

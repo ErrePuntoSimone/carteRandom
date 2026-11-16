@@ -16,6 +16,7 @@ function requireManager(room, player) {
 
 const manager = createRoomManager({
   maxPlayers: 12,
+  listInfo(room) { return { label: room.game.phase && room.game.phase !== 'lobby' ? 'In corso' : 'In attesa' }; },
   createGame(host) {
     const t = E.createTable();
     E.addPlayer(t, host.id, host.name);
