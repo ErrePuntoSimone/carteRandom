@@ -88,12 +88,14 @@ un'isola galleggiante e tre piattaforme sospese. Lo scopo è buttare fuori dallo
 - **Percentuale di danno:** ogni pugno la fa salire; più è alta, più lontano si vola. Si perde una vita uscendo dai bordi,
   si rientra dall'alto con qualche istante di protezione. Vince l'ultimo che resta (vite da 1 a 5, scelte dall'host).
 - **Attacchi:** *pugno* veloce e *forte* lento ma potente, in avanti, verso l'alto o verso il basso (tenendo su o giù).
-  In più un salto da terra e uno in aria, la discesa dalle piattaforme e la *schivata* che rende intoccabili per un attimo.
+  In più un salto da terra e due in aria, la discesa dalle piattaforme e la *schivata* che rende intoccabili per un attimo.
 - **Pugno forte caricabile:** tenendo premuto Forte il lottatore si carica, fino a un massimo di 2 secondi, poi il colpo
   parte da solo (o al rilascio). Più si carica, più il colpo fa danno (fino al doppio) e lancia lontano (fino a +70%),
   e il passo in avanti si allunga. Con un tocco veloce il colpo parte come prima, senza ritardo. Mentre si carica si
   è fermi a terra e vulnerabili: un colpo ricevuto annulla la carica, la schivata la interrompe. Si vede un alone
   e una barra sopra il lottatore, anche per gli avversari. I bot ogni tanto caricano un po'.
+  Dopo un forte caricato si resta **fermi di più**, in proporzione alla carica (fino a 0,7 s a carica piena, `PHYS.chargeRecovery`),
+  e quella pausa non si può annullare con un salto.
 - **Fluidità dei comandi:** colpendo si fa un **passo in avanti** (poco col pugno veloce, di più col forte, meno verso
   l'alto o in aria) senza mai cadere dall'isola; appena lasciato un bordo si può ancora **saltare da terra** (tolleranza
   di 0,1 s); un salto premuto poco prima di atterrare **parte da solo**; durante il **recupero** di un colpo si può

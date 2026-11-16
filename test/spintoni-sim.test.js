@@ -25,9 +25,10 @@ test('si sta in piedi sull\'isola, si cammina, si salta due volte', () => {
   S.stepFighter(f, { ...N, j: true });
   assert.ok(f.vy < vyBefore, 'doppio salto');
   S.stepFighter(f, { ...N, j: true });
+  assert.ok(f.jumps === 0 || S.PHYS.airJumps > 2, 'due salti in aria usati');
   steps(f, N, 60);
   assert.ok(f.g, 'riatterra');
-  assert.strictEqual(f.jumps, 1);
+  assert.strictEqual(f.jumps, S.PHYS.airJumps);
 });
 
 test('piattaforme sospese: ci si sale dal basso e si scende tenendo giù', () => {
@@ -185,13 +186,13 @@ test('salto perdonato: subito dopo aver lasciato il bordo si salta ancora da ter
   assert.ok(f.coyote > 0, 'ancora in tolleranza');
   S.stepFighter(f, { ...idleInp, j: true });
   assert.ok(f.vy < -900, `salto da terra: vy=${f.vy.toFixed(0)}`);
-  assert.strictEqual(f.jumps, 1, 'il doppio salto è ancora disponibile');
+  assert.strictEqual(f.jumps, S.PHYS.airJumps, 'i salti in aria sono ancora disponibili');
   // dopo la tolleranza è un normale doppio salto
   const late = walkOff();
   for (let i = 0; i < 5; i++) S.stepFighter(late, idleInp);
   assert.strictEqual(late.coyote, 0);
   S.stepFighter(late, { ...idleInp, j: true });
-  assert.strictEqual(late.jumps, 0, 'ormai usa il doppio salto');
+  assert.strictEqual(late.jumps, S.PHYS.airJumps - 1, 'ormai usa un salto in aria');
 });
 
 test('salto anticipato: se il doppio salto è già usato, il salto premuto poco prima di atterrare parte da solo', () => {
@@ -330,4 +331,45 @@ test('schivata in movimento: scatto lungo nella direzione scelta, da fermo resta
   S.stepFighter(g, { mx: 0, up: false, down: false, d: true });
   for (let i = 0; i < 12; i++) S.stepFighter(g, { mx: 0, up: false, down: false });
   assert.ok(Math.abs(g.x - 800) < 1, 'da fermo non si sposta');
+});
+
+test('tre salti in tutto: uno da terra e due in aria', () => {
+  const f = S.newFighter(800, 400, 'gilda');
+  steps(f, N, 40); // atterra
+  S.stepFighter(f, { ...N, j: true });
+  let n = 1;
+  for (let k = 0; k < 4; k++) {
+    steps(f, N, 6);
+    const vy = f.vy;
+    S.stepFighter(f, { ...N, j: true });
+    if (f.vy < vy - 300) n++;
+  }
+  assert.strictEqual(n, 3);
+});
+
+test('dopo il forte caricato si resta fermi di più, in proporzione alla carica', () => {
+  const run1 = (hold) => {
+    const f = onIsland(800);
+    let t = 0, c = 0;
+    S.stepFighter(f, { ...idleInp, h: true, hd: hold > 0 });
+    for (let i = 0; i < 400 && f.att; i++) {
+      S.stepFighter(f, { ...idleInp, hd: i * S.TICK < hold });
+      if (f.att) c = f.att.c;
+      t += S.TICK;
+    }
+    return { t, c };
+  };
+  const a = run1(0), b = run1(1), d = run1(2);
+  // pausa = durata - tempo passato a caricare - durata senza carica
+  const pause = (r) => r.t - r.c - a.t;
+  assert.ok(pause(b) > 0.2, `carica ${b.c.toFixed(2)} s: pausa ${pause(b).toFixed(2)}`);
+  assert.ok(pause(d) > pause(b) + 0.15, 'la pausa cresce con la carica');
+  assert.ok(Math.abs(pause(d) - S.PHYS.chargeRecovery) < 0.1, `a carica piena la pausa vale chargeRecovery (${pause(d).toFixed(2)})`);
+  // durante la pausa non si può annullare con un salto
+  const f = onIsland(800);
+  S.stepFighter(f, { ...idleInp, h: true, hd: true });
+  for (let i = 0; i < 70; i++) S.stepFighter(f, { ...idleInp, hd: true });
+  for (let i = 0; i < 20 && f.att && f.att.rel === false; i++) S.stepFighter(f, idleInp);
+  S.stepFighter(f, { ...idleInp, j: true });
+  assert.ok(f.g && f.att, 'il salto non annulla la pausa del forte caricato');
 });
