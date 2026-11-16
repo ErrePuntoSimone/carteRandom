@@ -24,6 +24,8 @@
     dodgeTime: 0.28, dodgeCd: 0.9, dodgeSpeed: 860,
     dropTime: 0.25, buffer: 0.15,
     chargeMax: 2, // secondi massimi di carica del pugno forte
+    chargeRecovery: 0.7, // fermo in più dopo un forte caricato: proporzionale alla carica (massimo, a carica piena)
+    airJumps: 2, // salti in aria disponibili dopo aver lasciato il suolo
     coyote: 0.1, jumpBuffer: 0.12, // salto ancora possibile appena lasciato il bordo / salto premuto poco prima di atterrare
   };
 
@@ -63,7 +65,7 @@
 
   function newFighter(x, y, char) {
     return {
-      x, y, vx: 0, vy: 0, face: 1, g: false, onPlat: false, jumps: 1,
+      x, y, vx: 0, vy: 0, face: 1, g: false, onPlat: false, jumps: PHYS.airJumps,
       att: null, attN: 0, buf: null, hs: 0, dg: 0, dgDir: 0, dodgeCd: 0, inv: 0, drop: 0, coyote: 0, jbuf: 0,
       char: CHARS[char] ? char : 'gilda',
     };
@@ -80,6 +82,8 @@
   }
 
   const moveTotal = (m) => m.startup + m.active + m.recovery;
+  // durata complessiva di un attacco in corso: il forte caricato resta fermo di più, in proporzione alla carica
+  const attackTotal = (a) => moveTotal(MOVES[a.ty]) + chargeFrac(a) * PHYS.chargeRecovery;
   const isActive = (att) => {
     if (!att) return false;
     const m = MOVES[att.ty];
@@ -157,7 +161,7 @@
         if (inp.hd && a.c < PHYS.chargeMax) { a.c = Math.min(PHYS.chargeMax, a.c + dt); a.t = m.startup - 0.001; }
         else { a.rel = true; a.t += dt; }
       } else a.t += dt;
-      if (a.t >= moveTotal(m)) f.att = null;
+      if (a.t >= attackTotal(a)) f.att = null;
     }
     // la schivata interrompe la carica
     if (f.att && f.att.ty === 'heavy' && !f.att.rel && f.att.c > 0 && inp.d && f.dodgeCd <= 0) f.att = null;
@@ -204,12 +208,13 @@
     }
 
     // salto e doppio salto; durante il recupero di un colpo si può annullare saltando
-    const recovering = f.att && f.att.t >= MOVES[f.att.ty].startup + MOVES[f.att.ty].active;
+    // dopo il colpo si può annullare con un salto, ma non se era caricato: quella pausa va scontata
+    const recovering = f.att && !(f.att.c > 0) && f.att.t >= MOVES[f.att.ty].startup + MOVES[f.att.ty].active;
     if (f.jbuf > 0 && (!f.att || recovering) && f.dg <= 0) {
       if (f.g || f.coyote > 0) {
         // da terra, o appena lasciato il bordo (o salto premuto poco prima di atterrare)
         f.att = null; f.buf = null;
-        f.vy = -ch.jump; f.g = false; f.jumps = 1; f.coyote = 0; f.jbuf = 0;
+        f.vy = -ch.jump; f.g = false; f.jumps = PHYS.airJumps; f.coyote = 0; f.jbuf = 0;
       } else if (inp.j && f.jumps > 0) {
         // in aria una pressione nuova usa il doppio salto; se è già stato usato il salto resta in memoria (jbuf) e parte all'atterraggio
         f.att = null; f.buf = null;
@@ -264,7 +269,7 @@
     f.y = y;
     if (f.vy > 0) f.vy = 0;
     f.g = true;
-    f.jumps = 1;
+    f.jumps = PHYS.airJumps;
   }
 
   const outOfBounds = (f) => f.x < STAGE.blast.l || f.x > STAGE.blast.r || f.y > STAGE.blast.b || f.y < STAGE.blast.t;
@@ -285,7 +290,7 @@
   ];
   const colorHex = (id) => (COLORS.find((c) => c.id === id) || {}).hex || null;
 
-  const api = { TICK, STAGE, PHYS, CHARS, MOVES, COLORS, colorHex, newFighter, physState, stepFighter, hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds, lungeVelocity, chargeFrac };
+  const api = { TICK, STAGE, PHYS, CHARS, MOVES, COLORS, colorHex, newFighter, physState, stepFighter, hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds, lungeVelocity, chargeFrac, attackTotal };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SpintoniShared = api;
 })(typeof self !== 'undefined' ? self : this);
