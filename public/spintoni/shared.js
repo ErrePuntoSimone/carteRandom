@@ -23,6 +23,7 @@
     jumpMul: 0.9, w: 46, h: 86,
     dodgeTime: 0.28, dodgeCd: 0.9, dodgeSpeed: 520,
     dropTime: 0.25, buffer: 0.15,
+    coyote: 0.1, jumpBuffer: 0.12, // salto ancora possibile appena lasciato il bordo / salto premuto poco prima di atterrare
   };
 
   // Lottatori originali: stessa mossa base, peso e potenza diversi.
@@ -38,6 +39,7 @@
   const MOVES = {
     light: {
       startup: 0.05, active: 0.08, recovery: 0.13, dmg: 5, base: 320, growth: 7,
+      lunge: { speed: 200, time: 0.12 }, // passo in avanti mentre si colpisce (unità/s, secondi)
       boxes: {
         side: { x: 30, y: -66, w: 66, h: 38, ang: 40 },
         up: { x: -34, y: -140, w: 68, h: 56, ang: 88 },
@@ -46,6 +48,7 @@
     },
     heavy: {
       startup: 0.2, active: 0.1, recovery: 0.28, dmg: 12, base: 470, growth: 13,
+      lunge: { speed: 280, time: 0.18 },
       boxes: {
         side: { x: 26, y: -76, w: 88, h: 54, ang: 38 },
         up: { x: -42, y: -158, w: 84, h: 70, ang: 85 },
@@ -60,13 +63,13 @@
   function newFighter(x, y, char) {
     return {
       x, y, vx: 0, vy: 0, face: 1, g: false, onPlat: false, jumps: 1,
-      att: null, attN: 0, buf: null, hs: 0, dg: 0, dgDir: 0, dodgeCd: 0, inv: 0, drop: 0,
+      att: null, attN: 0, buf: null, hs: 0, dg: 0, dgDir: 0, dodgeCd: 0, inv: 0, drop: 0, coyote: 0, jbuf: 0,
       char: CHARS[char] ? char : 'gilda',
     };
   }
 
   // Copia solo i campi di fisica (per la previsione sul telefono).
-  const FIELDS = ['x', 'y', 'vx', 'vy', 'face', 'g', 'onPlat', 'jumps', 'attN', 'hs', 'dg', 'dgDir', 'dodgeCd', 'inv', 'drop', 'char'];
+  const FIELDS = ['x', 'y', 'vx', 'vy', 'face', 'g', 'onPlat', 'jumps', 'attN', 'hs', 'dg', 'dgDir', 'dodgeCd', 'inv', 'drop', 'coyote', 'jbuf', 'char'];
   function physState(f) {
     const o = {};
     for (const k of FIELDS) o[k] = f[k];
@@ -92,6 +95,25 @@
   const hurtbox = (f) => ({ x: f.x - PHYS.w / 2, y: f.y - PHYS.h, w: PHYS.w, h: PHYS.h });
   const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
+  // Velocità del passo in avanti dell'attacco in corso (0 se non c'è): decresce nel tempo.
+  // In avanti vale tutto, verso il basso un po' meno, verso l'alto poco; in aria la metà.
+  function lungeVelocity(f) {
+    const a = f.att;
+    if (!a) return 0;
+    const lg = MOVES[a.ty].lunge;
+    if (!lg || a.t >= lg.time) return 0;
+    const mult = a.dir === 'side' ? 1 : a.dir === 'down' ? 0.6 : 0.35;
+    return f.face * lg.speed * mult * (a.air ? 0.5 : 1) * (1 - 0.6 * (a.t / lg.time));
+  }
+
+  // Estremi della superficie su cui si sta in piedi (isola o piattaforma), per non cadere avanzando con un colpo.
+  function supportRange(f) {
+    if (f.onPlat) {
+      for (const p of STAGE.plats) if (f.x > p.x - 6 && f.x < p.x + p.w + 6 && Math.abs(f.y - p.y) < 3) return [p.x, p.x + p.w];
+    }
+    return [STAGE.main.x, STAGE.main.x + STAGE.main.w];
+  }
+
   /**
    * Un passo di fisica.
    * inp: { mx (-1..1), up, down (tenuti premuti), j, l, h, d, dd (premuti in questo passo) }
@@ -114,6 +136,10 @@
       if (f.g) f.vx = approach(f.vx, 0, PHYS.friction * 0.5 * dt);
       return f;
     }
+
+    // tolleranze: salto "perdonato" appena lasciato il bordo e salto premuto poco prima di atterrare
+    f.coyote = f.g ? PHYS.coyote : Math.max(0, f.coyote - dt);
+    f.jbuf = inp.j ? PHYS.jumpBuffer : Math.max(0, f.jbuf - dt);
 
     if (f.att) {
       f.att.t += dt;
@@ -148,15 +174,34 @@
       const acc = f.g ? (Math.abs(mx) < 0.1 || groundAttack ? PHYS.friction : PHYS.accel) : PHYS.airAccel;
       f.vx = approach(f.vx, target, acc * dt);
       if (!f.att && Math.abs(mx) > 0.3) f.face = sign(mx);
+      // passo in avanti mentre si colpisce (a terra non si esce dall'isola o dalla piattaforma)
+      const lg = lungeVelocity(f);
+      if (lg !== 0) {
+        if (f.g) {
+          const [lo, hi] = supportRange(f);
+          const nx = f.x + lg * dt;
+          if (nx > lo + 10 && nx < hi - 10) f.vx = lg;
+        } else {
+          f.vx = Math.max(-ch.speed * 1.2, Math.min(ch.speed * 1.2, f.vx + lg * 0.3));
+        }
+      }
     }
 
-    // salto e doppio salto
-    if (inp.j && !f.att && f.dg <= 0) {
-      if (f.g) { f.vy = -ch.jump; f.g = false; f.jumps = 1; }
-      else if (f.jumps > 0) { f.vy = -ch.jump * PHYS.jumpMul; f.jumps -= 1; }
+    // salto e doppio salto; durante il recupero di un colpo si può annullare saltando
+    const recovering = f.att && f.att.t >= MOVES[f.att.ty].startup + MOVES[f.att.ty].active;
+    if (f.jbuf > 0 && (!f.att || recovering) && f.dg <= 0) {
+      if (f.g || f.coyote > 0) {
+        // da terra, o appena lasciato il bordo (o salto premuto poco prima di atterrare)
+        f.att = null; f.buf = null;
+        f.vy = -ch.jump; f.g = false; f.jumps = 1; f.coyote = 0; f.jbuf = 0;
+      } else if (inp.j && f.jumps > 0) {
+        // in aria una pressione nuova usa il doppio salto; se è già stato usato il salto resta in memoria (jbuf) e parte all'atterraggio
+        f.att = null; f.buf = null;
+        f.vy = -ch.jump * PHYS.jumpMul; f.jumps -= 1; f.jbuf = 0;
+      }
     }
     // scendere da una piattaforma sospesa
-    if (inp.dd && f.g && f.onPlat && !f.att) { f.drop = PHYS.dropTime; f.g = false; f.y += 2; }
+    if (inp.dd && f.g && f.onPlat && !f.att) { f.drop = PHYS.dropTime; f.g = false; f.y += 2; f.coyote = 0; }
 
     // gravità (più veloce tenendo giù)
     const maxFall = inp.down && !f.g && f.vy > 0 ? PHYS.fastFall : PHYS.maxFall;
@@ -224,7 +269,7 @@
   ];
   const colorHex = (id) => (COLORS.find((c) => c.id === id) || {}).hex || null;
 
-  const api = { TICK, STAGE, PHYS, CHARS, MOVES, COLORS, colorHex, newFighter, physState, stepFighter, hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds };
+  const api = { TICK, STAGE, PHYS, CHARS, MOVES, COLORS, colorHex, newFighter, physState, stepFighter, hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds, lungeVelocity };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SpintoniShared = api;
 })(typeof self !== 'undefined' ? self : this);

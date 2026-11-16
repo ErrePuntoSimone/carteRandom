@@ -89,6 +89,10 @@ un'isola galleggiante e tre piattaforme sospese. Lo scopo è buttare fuori dallo
   si rientra dall'alto con qualche istante di protezione. Vince l'ultimo che resta (vite da 1 a 5, scelte dall'host).
 - **Attacchi:** *pugno* veloce e *forte* lento ma potente, in avanti, verso l'alto o verso il basso (tenendo su o giù).
   In più un salto da terra e uno in aria, la discesa dalle piattaforme e la *schivata* che rende intoccabili per un attimo.
+- **Fluidità dei comandi:** colpendo si fa un **passo in avanti** (poco col pugno veloce, di più col forte, meno verso
+  l'alto o in aria) senza mai cadere dall'isola; appena lasciato un bordo si può ancora **saltare da terra** (tolleranza
+  di 0,1 s); un salto premuto poco prima di atterrare **parte da solo**; durante il **recupero** di un colpo si può
+  **annullare saltando**. Sono nel codice condiviso (`public/spintoni/shared.js`), quindi vale uguale per server e telefono.
 - **Lottatori:** *Pepe* (leggero e veloce), *Gilda* (equilibrata), *Tonno* (pesante e potente) e *Micio*
   (gatto cavaliere con spada e scudo, solido e preciso).
 - **Colore dei dettagli:** nella sala d'attesa ognuno sceglie un colore (o i colori originali) che si applica a pochi
