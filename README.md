@@ -106,9 +106,40 @@ un'isola galleggiante e tre piattaforme sospese. Lo scopo è buttare fuori dallo
   dettagli del personaggio: polsini dei guantoni, strisce delle scarpe, fibbia, e la bandana di Pepe, la stella e il
   fermacoda di Gilda, la fascia sulla canottiera di Tonno, il mantello di Micio. I bot ne prendono uno a caso.
 - **Controlli:** sul telefono in orizzontale joystick a sinistra e pulsanti Salta, Pugno, Forte, Schiva a destra;
-  sul computer A/D o frecce, W/↑/spazio per saltare, S/↓ giù, J pugno, K forte, L o Maiusc schiva.
+  sul computer A/D o frecce, W/↑/spazio per saltare, S/↓ giù, J pugno, K forte, U speciale, L o Maiusc schiva.
 - **Rete:** come Rissa, il server simula a 30 passi al secondo e decide i colpi; il telefono prevede la propria fisica
   con lo stesso codice (`public/spintoni/shared.js`) e la riallinea a quella del server.
+
+### Personaggi di Spintoni: struttura e speciali
+
+Ogni lottatore è un file in `public/spintoni/chars/<id>.js`, e `chars/index.json` dice quali sono attivi e in che ordine.
+Il server li unisce in un solo script (`/spintoni/chars.js`) per il browser e li carica con `require` per la simulazione:
+lo stesso codice gira sul server e sul telefono (previsione), quindi tutto ciò che decide il gioco sta in questi file o nel motore.
+
+Un file contiene: `id`, `name`, `color`, `desc`, `stats` (`speed`, `jump`, `weight`, `power`) e `moves`.
+Le mosse `light` e `heavy` partono da quelle di base (`MOVES` in `shared.js`) e si possono cambiare in parte; la
+`special` è propria di ogni personaggio e parte con il tasto **Speciale** (U sul computer, pulsante giallo sul telefono)
+dopo il suo **tempo di ricarica** (`cooldown`). Campi che il motore sa gestire in ogni mossa:
+
+| campo | effetto |
+|---|---|
+| `startup`, `active`, `recovery` | tempi (s): preparazione, colpo attivo, recupero |
+| `dmg`, `base`, `growth`, `boxes` | danno, lancio e zone di colpo (`side`, `up`, `down`; una sola = vale per tutte le direzioni) |
+| `chargeable` | si carica tenendo premuto (come il forte) |
+| `lunge` | passetto in avanti `{ speed, time }` |
+| `motion` | spinte durante la mossa `[{ from, to, vx, vy, edgeStop }]` (scatti, salite) |
+| `keepOnLand` | in aria non si interrompe atterrando |
+| `armor` | corazza `{ from, to }`: i colpi fanno danno ma non lanciano né interrompono |
+| `counter` | parata `{ from, to, dmg, base, growth, ang }`: chi colpisce in quel momento viene respinto |
+| `cooldown`, `name`, `desc` | ricarica, nome e descrizione (mostrati nella scelta del lottatore) |
+| `anim` | animazione dello sprite da usare (es. `heavy_up`) |
+| `recover` | i bot la usano per rientrare dal vuoto |
+
+Speciali attuali: **Pepe** *Turbine* (sale ruotando, ottima per rientrare), **Gilda** *Contrattacco* (para e risponde),
+**Micio** *Affondo* (scatto in avanti con la spada), **Tonno** *Carica del toro* (scatto con corazza).
+Per un nuovo personaggio: copia un file in `chars/`, aggiungi l'id a `index.json` e mettine gli sprite in `sprites/`
+(senza sprite si usa il disegno a codice). Prossimi passi previsti: combo a catena, meccaniche con codice proprio
+(agganci), proiettili e modalità allenamento con le zone di colpo visibili.
 
 ### Mappa di Spintoni (PNG)
 

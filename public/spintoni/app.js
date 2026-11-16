@@ -148,7 +148,8 @@
         const d = S.CHARS[id];
         return `<button type="button" class="char" data-char="${id}" aria-pressed="false">
           <canvas data-portrait="${id}"></canvas><span class="cn">${esc(d.name)}</span>
-          <span class="cd">${esc(d.desc)}</span><span class="stats">${statBars(d)}</span></button>`;
+          <span class="cd">${esc(d.desc)}</span><span class="stats">${statBars(d)}</span>
+          ${d.moves.special ? `<span class="spc"><strong>⚡ ${esc(d.moves.special.name)}</strong> ${esc(d.moves.special.desc || '')} <em>(ricarica ${d.moves.special.cooldown} s)</em></span>` : ''}</button>`;
       }).join('');
       charsBuilt = true;
     }
@@ -217,7 +218,7 @@
 
     let snaps = [], clockOffset = null, last = null;
     let seq = 0, pending = [], pred = null, prevPred = null, lastTickAt = 0, meAlive = false;
-    const press = { j: false, l: false, h: false, d: false, dd: false };
+    const press = { j: false, l: false, h: false, s: false, d: false, dd: false };
     let heavyBtn = false;           // pulsante Forte tenuto premuto (touch / mouse): serve per caricare il colpo
     const keys = new Set();
     let stick = null;               // joystick sinistro
@@ -246,7 +247,7 @@
       clearInterval(cdTimer); cdTimer = setInterval(cdTick, 100);
       snaps = []; last = null; clockOffset = null;
       seq = 0; pending = []; pred = null; prevPred = null; meAlive = false;
-      particles = []; rings = []; shake = 0; cardsKey = '';
+      particles = []; rings = []; shake = 0; cardsKey = ''; spKey = '-';
       resize();
       connect();
       sendTimer = setInterval(sendInput, S.TICK * 1000);
@@ -303,7 +304,8 @@
 
     function onEvent(ev) {
       if (ev.t === 'hit') {
-        const heavy = ev.ty === 'heavy';
+        if (ev.arm) { burst(ev.x, ev.y, '#ffb74d', 10, 260); return; } // colpo assorbito dalla corazza
+        const heavy = ev.ty !== 'light';
         const ch = ev.ch || 0; // quanto era carico il colpo (0..1)
         burst(ev.x, ev.y, heavy ? '#ffeb3b' : '#ffffff', heavy ? 18 + Math.round(30 * ch) : 9, heavy ? 520 + 300 * ch : 320);
         rings.push({ x: ev.x, y: ev.y, born: performance.now(), r: heavy ? 70 + 70 * ch : 40 });
@@ -320,6 +322,10 @@
         clearTimeout(onEvent.t);
         onEvent.t = setTimeout(() => { b.hidden = true; }, 1300);
         if (navigator.vibrate && (ev.id === R.you || ev.by === R.you)) navigator.vibrate([60, 40, 90]);
+      } else if (ev.t === 'counter') {
+        burst(ev.x, ev.y, '#80deea', 26, 600);
+        rings.push({ x: ev.x, y: ev.y, born: performance.now(), r: 110 });
+        shake = Math.max(shake, 10);
       } else if (ev.t === 'spawn') {
         burst(ev.x, ev.y, '#81d4fa', 14, 300);
       }
@@ -398,10 +404,10 @@
       if (!ws || ws.readyState !== 1) return;
       const h = held();
       // giù appena premuto: scende dalle piattaforme
-      const inp = { mx: h.mx, up: h.up, down: h.down, hd: h.hd, j: press.j, l: press.l, h: press.h, d: press.d, dd: press.dd };
-      press.j = press.l = press.h = press.d = press.dd = false;
+      const inp = { mx: h.mx, up: h.up, down: h.down, hd: h.hd, j: press.j, l: press.l, h: press.h, sp: press.s, d: press.d, dd: press.dd };
+      press.j = press.l = press.h = press.s = press.d = press.dd = false;
       seq += 1;
-      ws.send(JSON.stringify({ t: 'in', s: seq, mx: +inp.mx.toFixed(3), up: inp.up ? 1 : 0, dn: inp.down ? 1 : 0, j: inp.j ? 1 : 0, l: inp.l ? 1 : 0, h: inp.h ? 1 : 0, hd: inp.hd ? 1 : 0, d: inp.d ? 1 : 0, dd: inp.dd ? 1 : 0 }));
+      ws.send(JSON.stringify({ t: 'in', s: seq, mx: +inp.mx.toFixed(3), up: inp.up ? 1 : 0, dn: inp.down ? 1 : 0, j: inp.j ? 1 : 0, l: inp.l ? 1 : 0, h: inp.h ? 1 : 0, sp: inp.sp ? 1 : 0, hd: inp.hd ? 1 : 0, d: inp.d ? 1 : 0, dd: inp.dd ? 1 : 0 }));
       if (pred && meAlive && !(last && last.raw.cd > 0)) {
         pending.push({ s: seq, inp });
         prevPred = { ...pred };
@@ -410,7 +416,7 @@
       lastTickAt = performance.now();
     }
 
-    const GAME_KEYS = ['w', 'a', 's', 'd', 'j', 'k', 'l', 'z', 'x', 'c', ' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+    const GAME_KEYS = ['w', 'a', 's', 'd', 'j', 'k', 'l', 'u', 'z', 'x', 'c', 'v', ' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
     window.addEventListener('keydown', (e) => {
       if (!active) return;
       const k = e.key.toLowerCase();
@@ -420,6 +426,7 @@
         if (k === 's' || k === 'arrowdown') press.dd = true;
         if (k === 'j' || k === 'z') press.l = true;
         if (k === 'k' || k === 'x') press.h = true;
+        if (k === 'u' || k === 'v') press.s = true;
         if (k === 'l' || k === 'c' || k === 'shift') press.d = true;
       }
       keys.add(k);
@@ -463,6 +470,26 @@
     window.addEventListener('resize', () => { if (active) resize(); });
 
     // ---------- disegno ----------
+    // ricarica della speciale: pulsante sul telefono e indicatore sul computer
+    let spKey = '';
+    function updateSpecial() {
+      const sp = pred && S.CHARS[pred.char] && S.CHARS[pred.char].moves.special;
+      const cd = sp ? pred.spCd || 0 : 0;
+      const key = sp ? `${sp.name}:${cd > 0 ? Math.ceil(cd * 10) : 'ok'}` : '';
+      if (key === spKey) return;
+      spKey = key;
+      const btn = document.querySelector('.pbtn.special');
+      const ind = $('sp-ind');
+      if (!sp) { ind.hidden = true; return; }
+      const frac = cd > 0 ? cd / sp.cooldown : 0;
+      btn.style.setProperty('--cd', frac.toFixed(3));
+      btn.classList.toggle('cooling', cd > 0);
+      btn.dataset.cd = cd > 0 ? (cd >= 1 ? String(Math.ceil(cd)) : cd.toFixed(1)) : '';
+      ind.hidden = false;
+      ind.classList.toggle('ready', cd <= 0);
+      ind.textContent = cd > 0 ? `⚡ ${sp.name}: ${cd.toFixed(1)} s` : `⚡ ${sp.name} pronta (U)`;
+    }
+
     function displayedMe() {
       if (!pred) return null;
       const t = Math.max(0, Math.min(1, (performance.now() - lastTickAt) / (S.TICK * 1000)));
@@ -495,6 +522,7 @@
       raf = requestAnimationFrame(frame);
       const dt = Math.min(0.05, (now - (lastFrame || now)) / 1000);
       lastFrame = now;
+      updateSpecial();
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       D.sky(ctx, W, H);
       if (!last) {

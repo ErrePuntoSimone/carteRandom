@@ -3,7 +3,7 @@
 // e sceglie il fotogramma giusto in base allo stato del lottatore.
 // Per cambiare grafica basta sostituire i PNG mantenendo lo stesso schema (vedi il file .json).
 window.SpintoniSprites = (() => {
-  const { MOVES, CHARS } = window.SpintoniShared;
+  const { CHARS, moveOf } = window.SpintoniShared;
   const store = {};
   const waiters = [];
   const RUN_STRIDE = 36; // unità percorse per ogni fotogramma di corsa (i piedi non "pattinano")
@@ -38,8 +38,9 @@ window.SpintoniSprites = (() => {
       return { name: 'dodge', frame: Math.max(0, Math.min(a.frames - 1, Math.floor(prog * a.frames))) };
     }
     if (st.a) {
-      const m = MOVES[st.a.ty];
-      const name = `${st.a.ty}_${st.a.dir === 'down' && st.a.air ? 'downair' : st.a.dir}`;
+      const m = moveOf(spr.meta.char, st.a.ty);
+      // le mosse possono indicare un'animazione dello sprite (es. la speciale usa quella del forte in alto)
+      const name = m.anim || `${st.a.ty}_${st.a.dir === 'down' && st.a.air ? 'downair' : st.a.dir}`;
       const a = A[name];
       if (a && a.phases) {
         const [s, ac, r] = a.phases;
@@ -49,6 +50,10 @@ window.SpintoniSprites = (() => {
         else if (t < m.startup + m.active) f = s + Math.min(ac - 1, Math.floor(((t - m.startup) / m.active) * ac));
         else f = s + ac + Math.min(r - 1, Math.floor(((t - m.startup - m.active) / m.recovery) * r));
         return { name, frame: f };
+      }
+      if (a) { // animazione senza fasi: scorre in proporzione alla durata della mossa
+        const tot = m.startup + m.active + m.recovery;
+        return { name, frame: Math.max(0, Math.min(a.frames - 1, Math.floor((st.a.t / tot) * a.frames))) };
       }
     }
     if (!st.g) return { name: 'air', frame: st.vy < -250 ? 0 : st.vy > 250 ? 2 : 1 };

@@ -44,6 +44,22 @@ function sendFile(res, file) {
   });
 }
 
+function sendCharsBundle(res) {
+  const dir = path.join(PUBLIC_DIR, 'spintoni', 'chars');
+  try {
+    const ids = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8'));
+    const body = ids
+      .filter((id) => /^[a-z0-9_-]+$/i.test(id))
+      .map((id) => `// ---- ${id} ----\n${fs.readFileSync(path.join(dir, `${id}.js`), 'utf8')}`)
+      .join('\n');
+    res.writeHead(200, { 'Content-Type': MIME['.js'], 'Cache-Control': 'no-cache' });
+    res.end(body);
+  } catch (err) {
+    console.error(err);
+    sendJson(res, 500, { error: 'Personaggi non disponibili.' });
+  }
+}
+
 function serveStatic(res, pathname) {
   let decoded;
   try { decoded = decodeURIComponent(pathname); } catch { return sendJson(res, 400, { error: 'Percorso non valido' }); }
@@ -86,6 +102,8 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(301, { Location: `/carte/r/${legacy[1].toUpperCase()}` });
       return res.end();
     }
+    // tutti i personaggi di Spintoni in un solo script (elenco e ordine in public/spintoni/chars/index.json)
+    if (url.pathname === '/spintoni/chars.js') return sendCharsBundle(res);
     serveStatic(res, url.pathname);
   } catch (err) {
     const status = err.status || 500;

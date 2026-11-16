@@ -53,7 +53,7 @@ class Sim {
     if (!(s > f.seq) || (f.queue.length && s <= f.queue[f.queue.length - 1].s)) return;
     f.queue.push({
       s, mx: Math.max(-1, Math.min(1, Number(m.mx) || 0)), up: !!m.up, down: !!m.dn,
-      j: !!m.j, l: !!m.l, h: !!m.h, hd: !!m.hd, d: !!m.d, dd: !!m.dd,
+      j: !!m.j, l: !!m.l, h: !!m.h, sp: !!m.sp, hd: !!m.hd, d: !!m.d, dd: !!m.dd,
     });
     if (f.queue.length > 10) f.queue.splice(0, f.queue.length - 10);
   }
@@ -123,28 +123,52 @@ class Sim {
       }
     }
     // i colpi si applicano tutti insieme: due pugni nello stesso istante vanno a segno entrambi
-    for (const [a, v, att] of hits) this.applyHit(a, v, att);
+    // (la parata e la corazza si guardano prima di applicarli, sullo stato di quell'istante)
+    const plan = hits.map(([a, v, att]) => [a, v, att, S.inWindow(v, 'counter'), S.inWindow(v, 'armor')]);
+    for (const [a, v, att, counter, armor] of plan) {
+      if (counter) this.counterHit(v, a, counter);
+      else this.applyHit(a, v, att, { armor: !!armor });
+    }
   }
 
-  applyHit(a, v, att) {
-    const move = S.MOVES[att.ty];
-    const box = move.boxes[att.dir];
+  // Lancio: danno, forza (base + crescita con il danno), angolo; potenza di chi colpisce e peso di chi lo subisce.
+  launch(a, v, { dmg, base, growth, ang, face, ty, p = 0, armor = false }) {
     const ca = S.CHARS[a.char], cv = S.CHARS[v.char];
-    const p = att.p || 0; // carica del pugno forte (0..1): fino al doppio del danno e quasi al doppio del lancio
-    const dmg = move.dmg * ca.power * (1 + p);
-    v.dmg = Math.min(999, v.dmg + dmg);
-    a.dealt += dmg;
-    const kb = (((move.base + move.growth * v.dmg) * ca.power) / cv.weight) * (1 + 0.7 * p);
-    const angDeg = att.dir === 'down' && att.air ? box.airAng : box.ang;
-    const ang = (angDeg * Math.PI) / 180;
-    v.vx = Math.cos(ang) * kb * a.face;
-    v.vy = -Math.sin(ang) * kb;
+    const d = dmg * ca.power * (1 + p);
+    v.dmg = Math.min(999, v.dmg + d);
+    a.dealt += d;
+    v.lastHitBy = a.id; v.lastHitAt = this.time;
+    const kb = (((base + growth * v.dmg) * ca.power) / cv.weight) * (1 + 0.7 * p);
+    if (armor) {
+      // corazza: il danno resta, il lancio no (e la mossa continua)
+      this.events.push({ t: 'hit', id: v.id, by: a.id, x: r1(v.x), y: r1(v.y - 50), ty, kb: 0, ch: 0, arm: 1, vx: 0, vy: 0 });
+      return;
+    }
+    const r = (ang * Math.PI) / 180;
+    v.vx = Math.cos(r) * kb * face;
+    v.vy = -Math.sin(r) * kb;
     if (v.g && v.vy > 0) v.vy = -v.vy * 0.45; // schiacciato a terra: rimbalza
     v.g = false;
     v.hs = Math.min(1.2, kb * 0.00032 + 0.08);
     v.att = null; v.buf = null; v.dg = 0;
-    v.lastHitBy = a.id; v.lastHitAt = this.time;
-    this.events.push({ t: 'hit', id: v.id, by: a.id, x: r1(v.x), y: r1(v.y - 50), ty: att.ty, kb: Math.round(kb), ch: r1(p), vx: r1(v.vx), vy: r1(v.vy) });
+    this.events.push({ t: 'hit', id: v.id, by: a.id, x: r1(v.x), y: r1(v.y - 50), ty, kb: Math.round(kb), ch: r1(p), vx: r1(v.vx), vy: r1(v.vy) });
+  }
+
+  applyHit(a, v, att, { armor = false } = {}) {
+    const move = S.moveOf(a.char, att.ty);
+    const box = move.boxes[att.dir] || move.boxes.side;
+    const p = att.p || 0; // carica del pugno forte (0..1): fino al doppio del danno e quasi al doppio del lancio
+    const ang = att.dir === 'down' && att.air && box.airAng !== undefined ? box.airAng : box.ang;
+    this.launch(a, v, { dmg: move.dmg, base: move.base, growth: move.growth, ang, face: a.face, ty: att.ty, p, armor });
+  }
+
+  // Parata riuscita: il colpo non arriva e chi para risponde subito.
+  counterHit(def, att, c) {
+    def.face = att.x >= def.x ? 1 : -1;
+    def.att = null;
+    def.inv = Math.max(def.inv, 0.25);
+    this.events.push({ t: 'counter', id: def.id, by: att.id, x: r1(def.x), y: r1(def.y - 60) });
+    this.launch(def, att, { dmg: c.dmg, base: c.base, growth: c.growth, ang: c.ang, face: def.face, ty: 'special' });
   }
 
   ko(f) {
@@ -185,14 +209,17 @@ class Sim {
     const offStage = f.x < m.x - 10 || f.x > m.x + m.w + 10 || f.y > m.y + 20;
 
     // rientro: verso il centro, salto quando si scende
+    const sp = S.CHARS[f.char].moves.special;
     if (offStage) {
       inp.mx = f.x < S.STAGE.w / 2 ? 1 : -1;
       if (f.vy > 120 && f.jumps > 0 && f.hs <= 0) inp.j = true;
+      // finiti i salti, chi ha una speciale per rientrare la usa
+      else if (f.vy > 120 && f.jumps === 0 && sp && sp.recover && f.spCd <= 0 && !f.att) inp.sp = true;
       return inp;
     }
 
     br.think -= dt;
-    if (br.think > 0) { br.holdT = Math.max(0, br.holdT - dt); return { ...br.inp, j: false, l: false, h: false, d: false, dd: false, hd: br.holdT > 0 }; }
+    if (br.think > 0) { br.holdT = Math.max(0, br.holdT - dt); return { ...br.inp, j: false, l: false, h: false, sp: false, d: false, dd: false, hd: br.holdT > 0 }; }
     br.think = 0.07 + this.rng() * 0.08; // tempo di reazione
 
     let target = null, bestD = Infinity;
@@ -217,6 +244,7 @@ class Sim {
       inp.mx = Math.sign(dx) * 0.4;
       const r = this.rng();
       if (target.att && r < 0.12 && f.dodgeCd <= 0) inp.d = true;
+      else if (sp && f.spCd <= 0 && r < 0.2 && (sp.counter ? target.att : true)) inp.sp = true;
       else if (r < 0.75) {
         const heavy = target.dmg > 60 ? this.rng() < 0.5 : this.rng() < 0.2;
         if (heavy) {
