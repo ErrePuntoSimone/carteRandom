@@ -10,6 +10,7 @@ const { acceptWebSocket } = require('../../lib/ws');
 const MAX_FIGHTERS = 4;
 const BOT_NAMES = ['Gomitata', 'Ceffone', 'Sberla', 'Pugnetto'];
 const durationSec = () => Number(process.env.SPINTONI_DURATION) || 240;
+const countdownSec = () => (process.env.SPINTONI_COUNTDOWN === undefined ? 5 : Number(process.env.SPINTONI_COUNTDOWN) || 0);
 const charOk = (c) => Object.prototype.hasOwnProperty.call(S.CHARS, c);
 const fighters = (g, room) => room.players.size + g.bots.length;
 
@@ -107,7 +108,7 @@ const manager = createRoomManager({
       ];
       for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
       g.order = list.map((f) => ({ id: f.id, name: f.name, char: f.char, color: f.bot ? (g.bots.find((b) => b.id === f.id) || {}).color : g.colors[f.id] || null }));
-      g.sim = new Sim({ players: list, stocks: g.stocks, duration: durationSec() });
+      g.sim = new Sim({ players: list, stocks: g.stocks, duration: durationSec(), countdown: countdownSec() });
       g.phase = 'playing';
       g.results = null;
       g.matchNo += 1;

@@ -10,7 +10,8 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
 const NEUTRAL = { mx: 0, up: false, down: false };
 
 class Sim {
-  constructor({ players, stocks = 3, duration = 240, rng = Math.random }) {
+  constructor({ players, stocks = 3, duration = 240, countdown = 0, rng = Math.random }) {
+    this.cd = countdown; // conto alla rovescia iniziale (secondi): tutti fermi, il tempo non scorre
     this.rng = rng;
     this.stocks = stocks;
     this.duration = duration;
@@ -60,9 +61,18 @@ class Sim {
   step() {
     if (this.over) return;
     const dt = S.TICK;
-    this.time += dt;
     this.tick += 1;
     this.events = [];
+    if (this.cd > 0) {
+      this.cd = Math.max(0, this.cd - dt);
+      for (const f of this.fighters.values()) {
+        if (f.queue.length) f.seq = f.queue[f.queue.length - 1].s; // input confermati ma ignorati
+        f.queue.length = 0;
+        f.held = { ...NEUTRAL };
+      }
+      return;
+    }
+    this.time += dt;
 
     for (const f of this.fighters.values()) {
       if (!f.alive) {
@@ -238,7 +248,7 @@ class Sim {
       fs.push(base);
     }
     return {
-      t: 's', k: this.tick, ack: me ? me.seq : 0,
+      t: 's', k: this.tick, ack: me ? me.seq : 0, cd: r1(this.cd),
       left: r1(Math.max(0, this.duration - this.time)),
       f: fs, ev: this.events,
     };

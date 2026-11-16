@@ -234,6 +234,7 @@
       $('screen-game').hidden = false;
       $('dead').hidden = true;
       $('feed').innerHTML = '';
+      $('countdown').hidden = true; cdShown = false;
       snaps = []; last = null; clockOffset = null;
       seq = 0; pending = []; pred = null; prevPred = null;
       fireCount = 0; superCount = 0; fireAim = null; superAim = null;
@@ -284,7 +285,7 @@
           pred = { x: me.x, y: me.y };
           prevPred = { ...pred };
         } else {
-          pending = pending.filter((i) => i.s > m.ack);
+          pending = m.cd > 0 ? [] : pending.filter((i) => i.s > m.ack); // durante il conto alla rovescia il server ignora gli input
           const r = A.CHARS[me.c].radius, sp = A.CHARS[me.c].speed;
           const p = { x: me.x, y: me.y };
           for (const i of pending) A.stepMove(p, i.mx, i.my, sp, r);
@@ -336,7 +337,23 @@
       setTimeout(() => el.remove(), 4500);
     }
 
+    let cdShown = false, goTimer = null;
+    function updateCountdown(m) {
+      const el = $('countdown');
+      if (m.cd > 0) {
+        const n = String(Math.ceil(m.cd));
+        if (el.textContent !== n || el.hidden) { el.textContent = n; el.hidden = false; el.classList.remove('go'); el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
+        cdShown = true;
+      } else if (cdShown) {
+        cdShown = false;
+        el.textContent = 'VIA!'; el.hidden = false; el.classList.add('go');
+        clearTimeout(goTimer);
+        goTimer = setTimeout(() => { el.hidden = true; }, 800);
+      }
+    }
+
     function updateHud(m, me) {
+      updateCountdown(m);
       const left = Math.ceil(m.left);
       $('timer').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
       $('timer').classList.toggle('low', left <= 15);
@@ -408,7 +425,7 @@
       ws.send(JSON.stringify({ t: 'in', s: seq, mx: +mx.toFixed(3), my: +my.toFixed(3), ax: +ax.toFixed(3), ay: +ay.toFixed(3), f: fireCount, u: superCount }));
       // previsione immediata del mio movimento
       const me = last && last.p.get(S.you);
-      if (pred && me && me.al && !me.d) {
+      if (pred && me && me.al && !me.d && !(last.raw.cd > 0)) {
         pending.push({ s: seq, mx, my });
         prevPred = { ...pred };
         A.stepMove(pred, mx, my, A.CHARS[myChar].speed, A.CHARS[myChar].radius);

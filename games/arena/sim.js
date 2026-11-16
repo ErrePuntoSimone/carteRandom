@@ -22,7 +22,8 @@ class Sim {
    * @param {number} [o.target]   KO per vincere
    * @param {() => number} [o.rng]
    */
-  constructor({ players, duration = 120, target = 10, rng = Math.random }) {
+  constructor({ players, duration = 120, target = 10, countdown = 0, rng = Math.random }) {
+    this.cd = countdown; // conto alla rovescia iniziale (secondi): tutti fermi, il tempo non scorre
     this.rng = rng;
     this.duration = duration;
     this.target = target;
@@ -73,9 +74,18 @@ class Sim {
   step() {
     if (this.over) return;
     const dt = A.TICK;
-    this.time += dt;
     this.tick += 1;
     this.events = [];
+    if (this.cd > 0) {
+      this.cd = Math.max(0, this.cd - dt);
+      for (const p of this.players.values()) {
+        if (p.queue.length) p.seq = p.queue[p.queue.length - 1].s; // input confermati ma ignorati
+        p.queue.length = 0;
+        p.fireDone = p.fireReq; p.supDone = p.supReq;
+      }
+      return;
+    }
+    this.time += dt;
 
     for (const p of this.players.values()) {
       if (!p.alive) {
@@ -353,7 +363,7 @@ class Sim {
       });
     }
     return {
-      t: 's', k: this.tick, ack: viewer ? viewer.seq : 0,
+      t: 's', k: this.tick, ack: viewer ? viewer.seq : 0, cd: r1(this.cd),
       left: r1(Math.max(0, this.duration - this.time)),
       p: players,
       b: this.bullets.map((b) => ({ id: b.id, x: r1(b.x), y: r1(b.y), c: b.char, s: b.kind === 'super' ? 1 : 0 })),

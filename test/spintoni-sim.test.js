@@ -301,3 +301,21 @@ test('un colpo ricevuto o la schivata interrompono la carica', () => {
   S.stepFighter(f, { ...idleInp, hd: true, d: true });
   assert.ok(!f.att && f.dg > 0, 'la schivata interrompe la carica');
 });
+
+test('conto alla rovescia: tutti fermi, input ignorati ma confermati, il tempo parte dopo', () => {
+  const sim = new Sim({ players: [{ id: 'a', name: 'A', char: 'gilda' }, { id: 'b', name: 'B', char: 'tonno' }], countdown: 5, rng: seeded(3) });
+  const a = sim.fighters.get('a');
+  const x0 = a.x;
+  sim.pushInput('a', { s: 1, mx: 1, up: 0, dn: 0, j: 1, l: 0, h: 0, d: 0, dd: 0 });
+  for (let i = 0; i < Math.round(4.9 / S.TICK); i++) sim.step();
+  assert.ok(sim.snapshot('a').cd > 0, 'conto ancora in corso');
+  assert.strictEqual(a.x, x0, 'fermo durante il conto');
+  assert.strictEqual(sim.time, 0, 'il tempo non scorre');
+  assert.strictEqual(sim.snapshot('a').ack, 1, 'input confermato');
+  for (let i = 0; i < Math.round(0.4 / S.TICK); i++) sim.step();
+  assert.strictEqual(sim.snapshot('a').cd, 0);
+  sim.pushInput('a', { s: 2, mx: 1, up: 0, dn: 0, j: 0, l: 0, h: 0, d: 0, dd: 0 });
+  for (let i = 0; i < 10; i++) sim.step();
+  assert.ok(a.x > x0, 'dopo il conto si muove');
+  assert.ok(sim.time > 0);
+});

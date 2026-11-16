@@ -135,6 +135,10 @@ Se le immagini mancano, il gioco usa il disegno a codice (`public/spintoni/draw.
 - **Temporizzazione:** i pugni hanno tre fasi (carica, colpo, recupero) che seguono i tempi del gioco, così il fotogramma
   d'impatto coincide con il momento in cui il colpo va a segno.
 
+## Conto alla rovescia
+
+In Rissa e Spintoni, a inizio partita c'è un conto alla rovescia di **5 secondi** ("5, 4, 3, 2, 1, VIA!"): tutti restano fermi, gli input vengono ignorati e il tempo di gioco non scorre. Il server lo guida (`countdown` nella simulazione) e i client non fanno previsioni mentre dura. Si può cambiare con `SPINTONI_COUNTDOWN` / `ARENA_COUNTDOWN` (secondi, `0` per toglierlo).
+
 ## Partite pubbliche
 
 In ogni stanza multiplayer chi l'ha creata può attivare **«Stanza pubblica»**: la partita compare nel riquadro **Partite aperte** del menu e chiunque può entrarci con un tocco, senza codice. Compaiono solo le stanze in cui si può davvero entrare (non piene, non già iniziate per i giochi in tempo reale). Di default le stanze restano private. API: `GET /api/<gioco>/rooms` (elenco), `POST /api/<gioco>/rooms/<codice>/visibility` (`{ public: true|false }`, solo host).

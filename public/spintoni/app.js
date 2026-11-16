@@ -242,6 +242,7 @@
       $('screen-lobby').hidden = true;
       $('screen-game').hidden = false;
       $('banner').hidden = true;
+      $('countdown').hidden = true; cdShown = false;
       snaps = []; last = null; clockOffset = null;
       seq = 0; pending = []; pred = null; prevPred = null; meAlive = false;
       particles = []; rings = []; shake = 0; cardsKey = '';
@@ -285,6 +286,7 @@
       if (me && me.al && me.ph) {
         const base = JSON.parse(JSON.stringify(me.ph));
         pending = pending.filter((i) => i.s > m.ack);
+        if (m.cd > 0) pending = []; // conto alla rovescia: il server ignora gli input
         for (const i of pending) S.stepFighter(base, i.inp);
         if (!pred) { pred = base; prevPred = { ...base }; }
         else {
@@ -329,7 +331,23 @@
       if (particles.length > 500) particles.splice(0, particles.length - 500);
     }
 
+    let cdShown = false, goTimer = null;
+    function updateCountdown(m) {
+      const el = $('countdown');
+      if (m.cd > 0) {
+        const n = String(Math.ceil(m.cd));
+        if (el.textContent !== n || el.hidden) { el.textContent = n; el.hidden = false; el.classList.remove('go'); el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
+        cdShown = true;
+      } else if (cdShown) {
+        cdShown = false;
+        el.textContent = 'VIA!'; el.hidden = false; el.classList.add('go');
+        clearTimeout(goTimer);
+        goTimer = setTimeout(() => { el.hidden = true; }, 800);
+      }
+    }
+
     function updateHud(m) {
+      updateCountdown(m);
       const left = Math.ceil(m.left);
       $('timer').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
       const list = m.f.slice().sort((a, b) => a.sl - b.sl);
@@ -379,7 +397,7 @@
       press.j = press.l = press.h = press.d = press.dd = false;
       seq += 1;
       ws.send(JSON.stringify({ t: 'in', s: seq, mx: +inp.mx.toFixed(3), up: inp.up ? 1 : 0, dn: inp.down ? 1 : 0, j: inp.j ? 1 : 0, l: inp.l ? 1 : 0, h: inp.h ? 1 : 0, hd: inp.hd ? 1 : 0, d: inp.d ? 1 : 0, dd: inp.dd ? 1 : 0 }));
-      if (pred && meAlive) {
+      if (pred && meAlive && !(last && last.raw.cd > 0)) {
         pending.push({ s: seq, inp });
         prevPred = { ...pred };
         S.stepFighter(pred, inp);

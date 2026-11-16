@@ -10,6 +10,7 @@ const { acceptWebSocket } = require('../../lib/ws');
 const MAX_FIGHTERS = 6;
 const BOT_NAMES = ['Bullone', 'Ruggine', 'Scintilla', 'Trottola', 'Fischio', 'Pepe'];
 const durationSec = () => Number(process.env.ARENA_DURATION) || 120;
+const countdownSec = () => (process.env.ARENA_COUNTDOWN === undefined ? 5 : Number(process.env.ARENA_COUNTDOWN) || 0);
 const charOk = (c) => Object.prototype.hasOwnProperty.call(A.CHARS, c);
 const fighters = (g, room) => room.players.size + g.bots.length;
 
@@ -91,7 +92,7 @@ const manager = createRoomManager({
       ];
       // posizioni di partenza mescolate
       for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
-      g.sim = new Sim({ players: list, duration: durationSec() });
+      g.sim = new Sim({ players: list, duration: durationSec(), countdown: countdownSec() });
       g.phase = 'playing';
       g.results = null;
       g.matchNo += 1;
