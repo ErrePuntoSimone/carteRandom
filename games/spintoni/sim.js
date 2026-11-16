@@ -45,7 +45,7 @@ class Sim {
       id, name, bot: !!bot, slot: i, dmg: 0, stocks: this.stocks, alive: true, respawnAt: 0, out: 0,
       kos: 0, falls: 0, dealt: 0, lastHitBy: null, lastHitAt: -99, hitBy: new Set(),
       queue: [], seq: 0, held: { ...NEUTRAL },
-      brain: bot ? { think: 0, inp: { ...NEUTRAL }, jumpT: 0, holdT: 0 } : null,
+      brain: bot ? { think: 0, inp: { ...NEUTRAL }, jumpT: 0, holdT: 0, hb: 0, hbT: 0 } : null,
     });
     this.fighters.set(id, f);
   }
@@ -291,6 +291,11 @@ class Sim {
       return inp;
     }
 
+    // pressione tenuta per una speciale (solo chi ha le barre): resta premuta finché non è passato holdSpecial
+    if (br.hbT > 0) {
+      br.hbT -= dt;
+      return { mx: 0, up: false, down: br.hb === 2, hb: br.hb };
+    }
     br.think -= dt;
     if (br.think > 0) { br.holdT = Math.max(0, br.holdT - dt); return { ...br.inp, j: false, l: false, h: false, sp: false, d: false, dd: false, hd: br.holdT > 0 }; }
     br.think = 0.07 + this.rng() * 0.08; // tempo di reazione
@@ -304,6 +309,26 @@ class Sim {
     if (!target) { br.inp = inp; return inp; }
 
     const dx = target.x - f.x, dy = target.y - f.y;
+    if (f.mt) { // speciali nascoste e suprema (il rng si usa solo qui, quindi gli altri bot non cambiano)
+      const dist = Math.hypot(dx, dy);
+      if (dist < 600 && S.SLOTS.every((k) => S.meterFull(f, k))) { // suprema subito
+        inp.ul = true;
+        br.inp = { mx: 0, up: false, down: false };
+        return inp;
+      }
+      const cs = S.CHARS[f.char].specials;
+      // proiettili a distanza media, le altre da vicino
+      const ready = S.SLOTS.filter((k) => S.meterFull(f, k)
+        && (cs[k].projectile ? dist >= 150 && dist <= 600 && Math.abs(dy) < 120 : dist < 150));
+      if (ready.length && !(f.att && f.att.ty.startsWith('sp:')) && this.rng() < 0.35) {
+        const k = ready[Math.floor(this.rng() * ready.length)];
+        f.face = dx >= 0 ? 1 : -1;
+        br.hb = 1 << S.SLOTS.indexOf(k);
+        br.hbT = S.PHYS.holdSpecial + 2 * dt;
+        br.inp = { mx: 0, up: false, down: false };
+        return { mx: 0, up: false, down: k === 'heavy', hb: br.hb };
+      }
+    }
     const near = Math.abs(dx) < 100 && Math.abs(dy) < 80;
     if (!near) {
       inp.mx = Math.sign(dx);

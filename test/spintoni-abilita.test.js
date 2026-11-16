@@ -355,3 +355,25 @@ test('pepe: kit completo', () => {
   assert.strictEqual(u.shots, 5);
   assert.ok(u.a.sts.some((s) => s.k === 'b'));
 });
+
+// ---- bot ----
+function seededBot(seed) { let s = seed; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; }
+function botDuel(dist, full) {
+  const sim = new Sim({ players: [{ id: 'a', name: 'A', char: 'pepe', bot: true }, { id: 'b', name: 'B', char: 'gilda' }], rng: seededBot(7) });
+  const A = sim.fighters.get('a'), B = sim.fighters.get('b');
+  A.x = 700; B.x = 700 + dist; A.face = 1; B.face = -1;
+  for (const f of [A, B]) { f.y = S.STAGE.main.y; f.g = true; f.inv = 99; }
+  for (const k of S.SLOTS) A.mt[k] = full.includes(k) ? S.CHARS.pepe.specials[k].charge : 0;
+  const seen = new Set();
+  return { sim, A, seen, run(sec) {
+    for (let i = 0; i < sec * 30; i++) { sim.step(); if (A.att && A.att.ty.startsWith('sp:')) seen.add(A.att.ty); }
+    return seen;
+  } };
+}
+
+test('bot: usa la suprema e le speciali quando sono pronte', () => {
+  assert.ok(botDuel(300, S.SLOTS).run(3).has('sp:ultimate'));
+  assert.ok(botDuel(100, ['special']).run(5).has('sp:special'));
+  assert.ok(botDuel(300, ['light']).run(5).has('sp:light'));
+  assert.ok(botDuel(400, ['heavy']).run(5).has('sp:heavy'));
+});
