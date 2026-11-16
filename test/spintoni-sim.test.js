@@ -319,3 +319,15 @@ test('conto alla rovescia: tutti fermi, input ignorati ma confermati, il tempo p
   assert.ok(a.x > x0, 'dopo il conto si muove');
   assert.ok(sim.time > 0);
 });
+
+test('schivata in movimento: scatto lungo nella direzione scelta, da fermo resta sul posto', () => {
+  const f = S.newFighter(800, 640, 'gilda'); f.g = true;
+  const x0 = f.x;
+  S.stepFighter(f, { mx: 1, up: false, down: false, d: true });
+  for (let i = 0; i < Math.round(S.PHYS.dodgeTime / S.TICK) + 2; i++) S.stepFighter(f, { mx: 1, up: false, down: false });
+  assert.ok(f.x - x0 > 200, `scatto di ${Math.round(f.x - x0)}`);
+  const g = S.newFighter(800, 640, 'gilda'); g.g = true;
+  S.stepFighter(g, { mx: 0, up: false, down: false, d: true });
+  for (let i = 0; i < 12; i++) S.stepFighter(g, { mx: 0, up: false, down: false });
+  assert.ok(Math.abs(g.x - 800) < 1, 'da fermo non si sposta');
+});

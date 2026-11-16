@@ -21,7 +21,7 @@
     g: 2700, maxFall: 1450, fastFall: 2100,
     accel: 5600, airAccel: 2600, friction: 4200,
     jumpMul: 0.9, w: 46, h: 86,
-    dodgeTime: 0.28, dodgeCd: 0.9, dodgeSpeed: 520,
+    dodgeTime: 0.28, dodgeCd: 0.9, dodgeSpeed: 860,
     dropTime: 0.25, buffer: 0.15,
     chargeMax: 2, // secondi massimi di carica del pugno forte
     coyote: 0.1, jumpBuffer: 0.12, // salto ancora possibile appena lasciato il bordo / salto premuto poco prima di atterrare
@@ -184,7 +184,7 @@
     const groundAttack = f.att && f.g;
     if (f.dg > 0) {
       if (f.g) f.vx = f.dgDir * PHYS.dodgeSpeed;
-      else { f.vx = f.dgDir * PHYS.dodgeSpeed * 0.7; f.vy = Math.min(f.vy, 60); }
+      else { f.vx = f.dgDir * PHYS.dodgeSpeed * 0.8; f.vy = Math.min(f.vy, 60); }
     } else {
       const target = groundAttack ? 0 : mx * ch.speed;
       const acc = f.g ? (Math.abs(mx) < 0.1 || groundAttack ? PHYS.friction : PHYS.accel) : PHYS.airAccel;
