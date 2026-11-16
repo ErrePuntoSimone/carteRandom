@@ -224,3 +224,105 @@ test('rientro: le barre restano dopo un KO', () => {
   assert.deepStrictEqual(f.mt, mt);
   assert.deepStrictEqual(f.sts, []);
 });
+
+// ---- proiettili ----
+const shot = { at: 0.1, speed: 900, ang: 0, grav: 0, life: 1.5, box: { w: 30, h: 30 }, dmg: 6, base: 300, growth: 6, kbAng: 30, dy: -50 };
+const shotMove = (projectile) => ({ ...mv('Colpo', 2), projectile });
+const shotChar = (id, projectile) => S.registerChar({ id, name: id, desc: '', stats, specials: { ...specials, light: shotMove(projectile) }, meter: { move: 0, hit: 0 } });
+shotChar('test_sh', shot);
+shotChar('test_sh5', Array.from({ length: 5 }, (_, i) => ({ ...shot, dy: -50 - i * 5 })));
+S.registerChar({ id: 'test_cn', name: 'Cn', desc: '', stats, meter: { move: 0, hit: 0 },
+  specials: { ...specials, light: { ...mv('Parata', 2), counter: { from: 0, to: 5, dmg: 5, base: 300, growth: 5, ang: 0 } } } });
+const cast = (sim, a) => { a.att = { ty: 'sp:light', dir: 'side', t: 0, air: false, id: 1, c: 0, rel: true }; };
+// tiratore a sinistra, bersaglio a 400 unità davanti, entrambi sull'isola
+const shotDuel = (cb = 'test_ab', ca = 'test_sh') => {
+  const [sim, a, b] = duel(ca, cb);
+  a.x = 700; a.y = b.y = S.STAGE.main.y; b.x = 1100; a.face = 1;
+  cast(sim, a);
+  return [sim, a, b];
+};
+const run = (sim, n) => { for (let i = 0; i < n; i++) sim.step(); };
+
+test('proiettile: nasce a at, vola e colpisce', () => {
+  const [sim, a, b] = shotDuel();
+  run(sim, 2);
+  assert.strictEqual(sim.shots.length, 0);
+  run(sim, 3);
+  assert.strictEqual(sim.shots.length, 1);
+  run(sim, 30);
+  assert.ok(b.dmg > 0);
+  assert.strictEqual(sim.shots.length, 0);
+  assert.strictEqual(a.dmg, 0);
+});
+
+test('proiettile: nasce una sola volta per attacco', () => {
+  const [sim] = shotDuel('test_ab');
+  sim.fighters.get('b').x = 1500; // lontano: non lo colpisce subito
+  run(sim, 12);
+  assert.strictEqual(sim.shots.length, 1);
+});
+
+test('proiettile: scade dopo life', () => {
+  const [sim] = shotDuel();
+  sim.fighters.get('b').x = 300; sim.fighters.get('b').y = 100; // fuori traiettoria
+  run(sim, 4);
+  assert.strictEqual(sim.shots.length, 1);
+  run(sim, Math.ceil((shot.life + 0.1) / S.TICK));
+  assert.strictEqual(sim.shots.length, 0);
+});
+
+test('proiettile: la schivata lo fa passare', () => {
+  const [sim, , b] = shotDuel();
+  b.inv = 1;
+  run(sim, 4);
+  run(sim, 15); // 0,5 s: ha superato b
+  assert.strictEqual(b.dmg, 0);
+  assert.strictEqual(sim.shots.length, 1);
+  assert.ok(sim.shots[0].x > b.x);
+});
+
+test('proiettile: la parata lo distrugge senza risposta', () => {
+  const [sim, a, b] = shotDuel('test_cn');
+  b.att = { ty: 'sp:light', dir: 'side', t: 0, air: false, id: 1, c: 0, rel: true };
+  const evs = [];
+  for (let i = 0; i < 30; i++) { sim.step(); evs.push(...sim.events); b.att.t = 0; }
+  assert.strictEqual(sim.shots.length, 0);
+  assert.strictEqual(a.dmg, 0); assert.strictEqual(b.dmg, 0);
+  assert.ok(evs.some((e) => e.t === 'counter'));
+});
+
+test('proiettile: elenco di proiettili', () => {
+  const [sim] = shotDuel('test_ab', 'test_sh5');
+  sim.fighters.get('b').x = 1500;
+  run(sim, 4);
+  assert.strictEqual(sim.shots.length, 5);
+});
+
+test('proiettile: resta in volo se chi l\'ha lanciato va KO e il KO vale per lui', () => {
+  const [sim, a, b] = shotDuel();
+  b.dmg = 999;
+  run(sim, 4);
+  assert.strictEqual(sim.shots.length, 1);
+  sim.ko(a);
+  run(sim, 60);
+  assert.strictEqual(a.kos, 1);
+});
+
+test('proiettile: nello snapshot', () => {
+  const [sim] = shotDuel();
+  assert.strictEqual(sim.snapshot('a').p, undefined);
+  run(sim, 4);
+  const p = sim.snapshot('b').p;
+  assert.strictEqual(p[0].length, 5);
+  assert.strictEqual(p[0][1], 'test_sh:light');
+  assert.ok(sim.events.concat([]).length >= 0);
+});
+
+test('proiettile: sparisce contro l\'isola', () => {
+  const [sim, a] = shotDuel();
+  a.att.ty = 'sp:light'; run(sim, 4);
+  sim.shots[0].y = S.STAGE.main.y + 10; sim.shots[0].x = S.STAGE.main.x + 50;
+  sim.fighters.get('b').x = 100; sim.fighters.get('b').y = 0;
+  run(sim, 1);
+  assert.strictEqual(sim.shots.length, 0);
+});

@@ -28,6 +28,8 @@ class Sim {
     this.tick = 0;
     this.over = false;
     this.events = [];
+    this.shots = []; // proiettili in volo (solo il server li simula)
+    this.shotSeq = 0;
     this.fighters = new Map();
     this.outOrder = 0;
     players.forEach((p, i) => this.add(p, i));
@@ -108,7 +110,8 @@ class Sim {
       }
     }
 
-    this.resolveHits();
+    this.spawnShots();
+    this.resolveHits(this.stepShots(dt));
 
     for (const f of this.fighters.values()) {
       if (f.alive && S.outOfBounds(f)) this.ko(f);
@@ -118,7 +121,7 @@ class Sim {
     if ((this.started >= 2 && left.length <= 1) || this.time >= this.duration) this.over = true;
   }
 
-  resolveHits() {
+  resolveHits(shotHits = []) {
     const hits = [];
     for (const a of this.fighters.values()) {
       if (!a.alive) continue;
@@ -139,6 +142,61 @@ class Sim {
       if (counter) this.counterHit(v, a, counter);
       else this.applyHit(a, v, att, { armor: !!armor });
     }
+    // proiettili: stessa regola, sullo stesso istante; la parata li distrugge senza risposta
+    const sPlan = shotHits.map(([s, v]) => [s, v, S.inWindow(v, 'counter'), S.inWindow(v, 'armor')]);
+    for (const [s, v, counter, armor] of sPlan) {
+      if (counter) { this.events.push({ t: 'counter', id: v.id, by: s.owner, x: r1(v.x), y: r1(v.y - 60) }); s.dead = true; continue; }
+      const o = this.fighters.get(s.owner); // anche se è KO o uscito: il colpo vale per lui
+      this.launch(o, v, { dmg: s.dmg, base: s.base, growth: s.growth, ang: s.kbAng, face: s.face, ty: s.ty, armor: !!armor, debuff: s.debuff, noLaunch: s.noLaunch });
+      if (!s.pierce) s.dead = true;
+    }
+    this.shots = this.shots.filter((s) => !s.dead);
+  }
+
+  // Un proiettile per voce di `projectile`, quando l'attacco supera `at` (una volta per attacco: f.att.shot).
+  spawnShots() {
+    for (const f of this.fighters.values()) {
+      if (!f.alive || !f.att) continue;
+      const pr = S.moveOf(f.char, f.att.ty).projectile;
+      if (!pr) continue;
+      const list = [].concat(pr);
+      const done = f.att.shot || (f.att.shot = []);
+      list.forEach((p, i) => {
+        if (done[i] || f.att.t < p.at) return;
+        done[i] = true;
+        const r = (p.ang * Math.PI) / 180;
+        const kind = `${f.char}:${f.att.ty.replace('sp:', '')}`;
+        const x = f.x + f.face * (p.dx || 0), y = f.y + (p.dy || 0);
+        this.shots.push({
+          id: ++this.shotSeq, owner: f.id, kind, ty: f.att.ty, x, y,
+          vx: Math.cos(r) * p.speed * f.face, vy: Math.sin(r) * p.speed, grav: p.grav || 0, life: p.life,
+          w: p.box.w, h: p.box.h, face: f.face, hit: new Set(), dmg: p.dmg, base: p.base, growth: p.growth,
+          kbAng: p.kbAng, pierce: !!p.pierce, debuff: p.debuff || null, noLaunch: !!p.noLaunch,
+        });
+        this.events.push({ t: 'shot', id: f.id, kind, x: r1(x), y: r1(y) });
+      });
+    }
+  }
+
+  // Muove i proiettili; restituisce i colpi [proiettile, vittima] da applicare insieme a quelli corpo a corpo.
+  stepShots(dt) {
+    const hits = [], m = S.STAGE.main, B = S.STAGE.blast;
+    for (const s of this.shots) {
+      s.vy += s.grav * dt;
+      s.x += s.vx * dt; s.y += s.vy * dt;
+      s.life -= dt;
+      if (s.life <= 0 || s.x < B.l || s.x > B.r || s.y < B.t || s.y > B.b
+        || (s.x > m.x && s.x < m.x + m.w && s.y > m.y && s.y < m.y + m.h)) { s.dead = true; continue; }
+      const box = { x: s.x - s.w / 2, y: s.y - s.h / 2, w: s.w, h: s.h };
+      for (const v of this.fighters.values()) {
+        if (v.id === s.owner || !v.alive || v.inv > 0 || s.hit.has(v.id)) continue;
+        if (!S.overlap(box, S.hurtbox(v))) continue;
+        s.hit.add(v.id);
+        hits.push([s, v]);
+        if (S.inWindow(v, 'counter') || !s.pierce) break; // un colpo solo: il resto lo decide resolveHits
+      }
+    }
+    return hits;
   }
 
   // Lancio: danno, forza (base + crescita con il danno), angolo; potenza di chi colpisce e peso di chi lo subisce.
@@ -298,6 +356,7 @@ class Sim {
       t: 's', k: this.tick, ack: me ? me.seq : 0, cd: r1(this.cd),
       left: r1(Math.max(0, this.duration - this.time)),
       f: fs, ev,
+      ...(this.shots.length ? { p: this.shots.map((s) => [s.id, s.kind, r1(s.x), r1(s.y), s.face]) } : {}),
     };
   }
 
