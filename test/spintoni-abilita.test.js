@@ -326,3 +326,32 @@ test('proiettile: sparisce contro l\'isola', () => {
   run(sim, 1);
   assert.strictEqual(sim.shots.length, 0);
 });
+
+// ---- Pepe ----
+test('pepe: kit completo', () => {
+  const sp = S.CHARS.pepe.specials;
+  assert.deepStrictEqual(Object.keys(sp), ['light', 'heavy', 'dodge', 'special', 'ultimate']);
+  const nomi = { light: 'Pugno di vento', heavy: 'Palla di fuoco', dodge: 'Turbo', special: 'Polverone', ultimate: 'Tempesta di fuoco' };
+  for (const k of Object.keys(nomi)) assert.strictEqual(sp[k].name, nomi[k]);
+  assert.ok(sp.heavy.charge > sp.light.charge);
+  assert.deepStrictEqual(S.CHARS.pepe.meter, { move: 0.7, hit: 0.3 });
+  // ogni speciale, lanciata con la barra piena, fa quello che promette
+  const prova = (slot, dist = 600) => {
+    const [sim, a, b] = duel('pepe', 'test_ab');
+    a.x = 700; a.y = b.y = S.STAGE.main.y; b.x = 700 + dist; a.face = 1;
+    a.att = { ty: 'sp:' + slot, dir: 'side', t: 0, air: false, id: 1, c: 0, rel: true };
+    let shots = 0;
+    for (let i = 0; i < 60; i++) { sim.step(); shots = Math.max(shots, sim.shots.length); }
+    return { shots, a, b };
+  };
+  assert.strictEqual(prova('light').shots, 1);
+  assert.strictEqual(prova('heavy').shots, 1);
+  assert.ok(prova('dodge').a.sts.some((s) => s.k === 'b'));
+  const p = prova('special', 100);
+  assert.ok(p.b.sts.some((s) => s.k === 'd'));
+  assert.ok(p.b.dmg > 0 || p.b.sts.length);
+  assert.strictEqual(p.b.vx, 0);
+  const u = prova('ultimate');
+  assert.strictEqual(u.shots, 5);
+  assert.ok(u.a.sts.some((s) => s.k === 'b'));
+});
