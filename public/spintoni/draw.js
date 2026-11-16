@@ -100,6 +100,47 @@ window.SpintoniDraw = (() => {
    * st: { c, fc, g, vx, vy, a: {ty, dir, t, air}, hs, dg, inv }, slot: colore del giocatore
    */
   function fighter(ctx, x, y, st, slot, now, opts = {}) {
+    const spr = window.SpintoniSprites && window.SpintoniSprites.get(st.c);
+    if (spr) { spriteFighter(ctx, x, y, st, now, spr); nameTag(ctx, x, y, slot, opts); return; }
+    vectorFighter(ctx, x, y, st, slot, now, opts);
+  }
+
+  // Disegno con le immagini PNG (sprite sheet).
+  function spriteFighter(ctx, x, y, st, now, spr) {
+    const f = st.fc || 1;
+    const { name, frame, tumble } = window.SpintoniSprites.pick(st, now, spr);
+    ctx.save();
+    if (st.inv && !tumble) ctx.globalAlpha = 0.55 + 0.35 * Math.sin(now / 60);
+    if (st.dg > 0) ctx.globalAlpha = 0.5;
+    if (st.g && !tumble) { ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.beginPath(); ctx.ellipse(x, y + 2, 30, 7, 0, 0, TAU); ctx.fill(); }
+    if (tumble) {
+      // in volo il personaggio ruota attorno al busto
+      ctx.translate(x, y - 44);
+      ctx.rotate((now / 1000) * 14 * f);
+      window.SpintoniSprites.drawFrame(ctx, spr, name, frame, 0, 44, f);
+    } else {
+      window.SpintoniSprites.drawFrame(ctx, spr, name, frame, x, y, f);
+    }
+    ctx.restore();
+  }
+
+  // Segnalino e nome sopra la testa.
+  function nameTag(ctx, x, y, slot, opts) {
+    if (opts.noTag) return;
+    const c = SLOT_COLORS[slot % 4];
+    ctx.save();
+    ctx.fillStyle = c; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x - 8, y - 118); ctx.lineTo(x + 8, y - 118); ctx.lineTo(x, y - 106); ctx.closePath(); ctx.fill(); ctx.stroke();
+    if (opts.name) {
+      ctx.font = '800 15px system-ui, sans-serif'; ctx.textAlign = 'center';
+      ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(opts.name, x, y - 124);
+      ctx.fillStyle = c; ctx.fillText(opts.name, x, y - 124);
+    }
+    ctx.restore();
+  }
+
+  // Disegno a codice: serve da riserva se le immagini non sono disponibili.
+  function vectorFighter(ctx, x, y, st, slot, now, opts = {}) {
     const ch = CHARS[st.c] || CHARS.gilda;
     const col = ch.color;
     const f = st.fc || 1;
@@ -223,19 +264,7 @@ window.SpintoniDraw = (() => {
     }
     ctx.restore();
 
-    // segnalino del giocatore sopra la testa
-    if (!opts.noTag) {
-      const c = SLOT_COLORS[slot % 4];
-      ctx.save();
-      ctx.fillStyle = c; ctx.strokeStyle = 'rgba(0,0,0,.6)'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(x - 8, y - 118); ctx.lineTo(x + 8, y - 118); ctx.lineTo(x, y - 106); ctx.closePath(); ctx.fill(); ctx.stroke();
-      if (opts.name) {
-        ctx.font = '800 15px system-ui, sans-serif'; ctx.textAlign = 'center';
-        ctx.lineWidth = 4; ctx.strokeStyle = 'rgba(0,0,0,.75)'; ctx.strokeText(opts.name, x, y - 124);
-        ctx.fillStyle = c; ctx.fillText(opts.name, x, y - 124);
-      }
-      ctx.restore();
-    }
+    nameTag(ctx, x, y, slot, opts);
   }
 
   function star(ctx, x, y, r) {
@@ -247,6 +276,7 @@ window.SpintoniDraw = (() => {
     ctx.closePath();
   }
 
+  const waiting = [];
   function portrait(canvas, char) {
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth || 70, h = canvas.clientHeight || 84;
@@ -257,7 +287,17 @@ window.SpintoniDraw = (() => {
     const s = h / 110;
     ctx.translate(w / 2 - 4 * s, h - 6 * s);
     ctx.scale(s, s);
-    fighter(ctx, 0, 0, { c: char, fc: 1, g: true, vx: 0, vy: 0, a: null, hs: 0, dg: 0 }, 0, 0, { noTag: true });
+    const spr = window.SpintoniSprites && window.SpintoniSprites.get(char);
+    if (!spr && window.SpintoniSprites && !waiting.some((q) => q.canvas === canvas)) waiting.push({ canvas, char });
+    fighter(ctx, 0, 0, { c: char, fc: 1, g: false, vx: 0, vy: 0, x: 0, a: null, hs: 0, dg: 0 }, 0, 0, { noTag: true });
+  }
+  // appena le immagini sono caricate si ridisegnano i ritratti già mostrati
+  if (window.SpintoniSprites) {
+    window.SpintoniSprites.onLoad((id) => {
+      for (let i = waiting.length - 1; i >= 0; i--) {
+        if (waiting[i].char === id) { portrait(waiting[i].canvas, id); waiting.splice(i, 1); }
+      }
+    });
   }
 
   // colore della percentuale: bianco → giallo → rosso → rosso scuro

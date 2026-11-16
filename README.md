@@ -95,6 +95,21 @@ un'isola galleggiante e tre piattaforme sospese. Lo scopo è buttare fuori dallo
 - **Rete:** come Rissa, il server simula a 30 passi al secondo e decide i colpi; il telefono prevede la propria fisica
   con lo stesso codice (`public/spintoni/shared.js`) e la riallinea a quella del server.
 
+### Grafica di Spintoni (sprite PNG)
+
+I lottatori sono disegnati con immagini PNG (sprite sheet) in `public/spintoni/sprites/`: per ognuno un file `.png`
+con tutti i fotogrammi in una griglia e un `.json` che descrive dimensioni, punto d'appoggio dei piedi e animazioni
+(fermo, corsa, salto, schivata, colpito e i pugni veloci e forti in avanti, in alto, in basso e in aria).
+Se le immagini mancano, il gioco usa il disegno a codice (`public/spintoni/draw.js`).
+
+- **Rigenerarle:** `node tools/bake-spintoni.js` le disegna con `tools/sprites/hd-render.js` (scheletro con gomiti e
+  ginocchia calcolati, contorni e ombreggiatura) e le esporta. Serve Playwright; con Pillow i PNG vengono anche ridotti
+  (circa 180 KB l'uno).
+- **Cambiare la grafica:** basta sostituire un `.png` mantenendo lo stesso schema (cella, punto d'appoggio, ordine e
+  numero dei fotogrammi del `.json`). Il test `test/spintoni-sprites.test.js` controlla che lo schema sia rispettato.
+- **Temporizzazione:** i pugni hanno tre fasi (carica, colpo, recupero) che seguono i tempi del gioco, così il fotogramma
+  d'impatto coincide con il momento in cui il colpo va a segno.
+
 ## Conta fiches
 
 Funziona su un solo dispositivo, senza server: i dati restano salvati nel browser.
@@ -137,7 +152,8 @@ public/carte/          interfaccia di Carte Random
 public/poker/          interfaccia del Poker
 public/briscola/       interfaccia della Briscola
 public/arena/          Rissa: codice condiviso, disegno su canvas e interfaccia
-public/spintoni/       Spintoni: fisica condivisa, disegno su canvas e interfaccia
+public/spintoni/       Spintoni: fisica condivisa, disegno, sprite e interfaccia
+tools/                 generatore degli sprite PNG (solo per sviluppo)
 public/fiches/         Conta fiches (solo lato browser)
 test/                  test automatici
 ```
