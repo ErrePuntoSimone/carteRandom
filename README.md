@@ -108,6 +108,12 @@ un'isola galleggiante e tre piattaforme sospese. Lo scopo è buttare fuori dallo
 - **Rete:** come Rissa, il server simula a 30 passi al secondo e decide i colpi; il telefono prevede la propria fisica
   con lo stesso codice (`public/spintoni/shared.js`) e la riallinea a quella del server.
 
+### Mappa di Spintoni (PNG)
+
+Anche la mappa è fatta di immagini, in `public/spintoni/maps/default/`: `sky.png` (cielo, steso su tutto lo schermo), `scenery.png` (sole, nuvole e colline, 2400×1300), `island.png` (isola principale) e `platform.png` (le piattaforme sospese, stirata alla larghezza di ognuna). `map.json` dice dove disegnare ogni immagine nel mondo di gioco (coordinate in unità di gioco, il campo è 1600×900). **Per personalizzare la mappa basta sostituire i PNG** (anche con altre dimensioni, adattando `map.json`). Se un'immagine manca, il gioco ripiega sul disegno a codice. Per rigenerare i PNG originali: `node tools/bake-map.js`.
+
+Attenzione: i PNG sono solo l'aspetto. Le superfici su cui si cammina (isola, piattaforme, spawn, limiti) sono in `STAGE` dentro `public/spintoni/shared.js`: se sposti l'isola o le piattaforme nell'immagine, aggiorna anche lì.
+
 ### Grafica di Spintoni (sprite PNG)
 
 I lottatori sono disegnati con immagini PNG (sprite sheet) in `public/spintoni/sprites/`: per ognuno un file `.png`
