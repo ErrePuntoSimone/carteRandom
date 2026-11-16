@@ -8,6 +8,14 @@ const KO_CREDIT = 8; // secondi in cui l'ultimo colpo vale come KO
 const r1 = (v) => Math.round(v * 10) / 10;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const NEUTRAL = { mx: 0, up: false, down: false };
+const SNAP_DEFAULTS = S.SNAP_DEFAULTS;
+// numeri della fisica arrotondati al millesimo: abbastanza per la previsione, molti meno caratteri
+function roundPh(o) {
+  for (const k in o) if (typeof o[k] === 'number') o[k] = r3(o[k]);
+  if (o.att) { o.att.t = r3(o.att.t); o.att.c = r3(o.att.c || 0); }
+  if (o.buf) o.buf.t = r3(o.buf.t);
+  return o;
+}
 
 class Sim {
   constructor({ players, stocks = 3, duration = 240, countdown = 0, rng = Math.random }) {
@@ -262,7 +270,8 @@ class Sim {
   }
 
   // ---------- stato da inviare ----------
-  snapshot(viewerId) {
+  // ev: eventi da includere (il server ci mette quelli accumulati dall'ultimo invio)
+  snapshot(viewerId, ev = this.events) {
     const me = this.fighters.get(viewerId);
     const fs = [];
     for (const f of this.fighters.values()) {
@@ -272,13 +281,15 @@ class Sim {
         a: f.att ? { ty: f.att.ty, dir: f.att.dir, t: r3(f.att.t), air: f.att.air, c: r3(f.att.c || 0), rel: f.att.rel ? 1 : 0 } : null,
         hs: r3(f.hs), dg: r3(f.dg), inv: f.inv > 0,
       };
-      if (f.id === viewerId) base.ph = S.physState(f);
+      // per risparmiare banda i valori "a riposo" non si mandano (il client li rimette con SNAP_DEFAULTS)
+      for (const k in SNAP_DEFAULTS) if (base[k] === SNAP_DEFAULTS[k]) delete base[k];
+      if (f.id === viewerId) base.ph = roundPh(S.physState(f));
       fs.push(base);
     }
     return {
       t: 's', k: this.tick, ack: me ? me.seq : 0, cd: r1(this.cd),
       left: r1(Math.max(0, this.duration - this.time)),
-      f: fs, ev: this.events,
+      f: fs, ev,
     };
   }
 

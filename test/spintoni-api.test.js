@@ -48,7 +48,7 @@ test('scontro via WebSocket: stato completo per sé, input confermati, fine part
   clearInterval(sender);
   ws.close();
 
-  assert.ok(snaps.length > 40, `snapshot: ${snaps.length}`);
+  assert.ok(snaps.length > 20, `snapshot: ${snaps.length}`); // 15 al secondo per 3 s
   const me = (s) => s.f.find((f) => f.id === a.playerId);
   assert.ok(me(snaps[0]).ph, 'il proprio stato di fisica arriva completo');
   assert.ok(!snaps[0].f.some((f) => f.id !== a.playerId && f.ph), 'quello degli altri no');

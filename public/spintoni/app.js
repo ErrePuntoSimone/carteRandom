@@ -277,7 +277,7 @@
       const now = performance.now();
       const off = now - m.k * S.TICK * 1000;
       clockOffset = clockOffset === null ? off : Math.min(off, clockOffset + 2);
-      const snap = { k: m.k, recv: now, f: new Map(m.f.map((f) => [f.id, f])), raw: m };
+      const snap = { k: m.k, recv: now, f: new Map(m.f.map((f) => [f.id, { ...S.SNAP_DEFAULTS, ...f }])), raw: m };
       snaps.push(snap);
       if (snaps.length > 40) snaps.shift();
       last = snap;
@@ -496,10 +496,10 @@
       return { ...pred, x: prevPred.x + (pred.x - prevPred.x) * t, y: prevPred.y + (pred.y - prevPred.y) * t };
     }
 
-    // gli altri: interpolati tra due snapshot, ~2 passi nel passato
+    // gli altri: interpolati tra due snapshot, un invio e mezzo nel passato (margine per i ritardi di rete)
     function others() {
       if (!snaps.length) return [];
-      const renderK = (performance.now() - clockOffset) / (S.TICK * 1000) - 2;
+      const renderK = (performance.now() - clockOffset) / (S.TICK * 1000) - S.SEND_EVERY * 1.5;
       let a = snaps[0], b = snaps[snaps.length - 1];
       for (let i = snaps.length - 1; i > 0; i--) {
         if (snaps[i - 1].k <= renderK) { a = snaps[i - 1]; b = snaps[i]; break; }
