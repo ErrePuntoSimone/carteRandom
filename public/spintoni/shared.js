@@ -98,6 +98,12 @@
     const sp = CHARS[f.char].specials;
     for (const k of SLOTS) f.mt[k] = Math.min(sp[k].charge, f.mt[k] + points);
   }
+  // buff e debuff attivi: ogni stato moltiplica la statistica (senza stati, il valore base esatto)
+  function statOf(f, key) {
+    let v = CHARS[f.char][key];
+    for (const s of f.sts) if (s[key] !== undefined) v *= s[key];
+    return v;
+  }
   const meterFull = (f, slot) => !!f.mt && f.mt[slot] >= CHARS[f.char].specials[slot].charge;
 
   const sign = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
@@ -108,7 +114,7 @@
       x, y, vx: 0, vy: 0, face: 1, g: false, onPlat: false, jumps: PHYS.airJumps,
       att: null, attN: 0, buf: null, hs: 0, dg: 0, dgDir: 0, dodgeCd: 0, spCd: 0, inv: 0, drop: 0, coyote: 0, jbuf: 0,
       char: CHARS[char] ? char : DEFAULT_CHAR,
-      mt: null, ht: null, spArm: null,
+      mt: null, ht: null, spArm: null, sts: [],
     };
     if (CHARS[f.char].specials) {
       f.mt = { light: 0, heavy: 0, dodge: 0, special: 0 };
@@ -123,10 +129,11 @@
   function physState(f) {
     const o = {};
     for (const k of FIELDS) o[k] = f[k];
-    o.att = f.att ? { ty: f.att.ty, dir: f.att.dir, t: f.att.t, air: f.att.air, id: f.att.id, c: f.att.c, rel: f.att.rel } : null;
+    o.att = f.att ? { ty: f.att.ty, dir: f.att.dir, t: f.att.t, air: f.att.air, id: f.att.id, c: f.att.c, rel: f.att.rel, bf: f.att.bf } : null;
     o.mt = f.mt ? { ...f.mt } : null;
     o.ht = f.ht ? { ...f.ht } : null;
     o.spArm = f.spArm ? { ...f.spArm } : null;
+    o.sts = f.sts.map((s) => ({ ...s }));
     o.buf = f.buf ? { ty: f.buf.ty, t: f.buf.t } : null;
     return o;
   }
@@ -206,6 +213,8 @@
     f.dodgeCd = Math.max(0, f.dodgeCd - dt);
     f.spCd = Math.max(0, (f.spCd || 0) - dt);
     f.drop = Math.max(0, f.drop - dt);
+    for (const s of f.sts) s.t -= dt;
+    if (f.sts.length) f.sts = f.sts.filter((s) => s.t > 0);
 
     if (f.hs > 0) {
       // in volo dopo un colpo: nessun controllo
@@ -230,6 +239,8 @@
         if (inp.hd && a.c < PHYS.chargeMax) { a.c = Math.min(PHYS.chargeMax, a.c + dt); a.t = m.startup - 0.001; }
         else { a.rel = true; a.t += dt; }
       } else a.t += dt;
+      // il buff della mossa parte una volta sola, quando si supera il suo istante
+      if (m.buff && !a.bf && a.t >= m.buff.at) { a.bf = true; f.sts.push({ k: 'b', t: m.buff.dur, ...m.buff }); }
       if (a.t >= attackTotal(f)) f.att = null;
     }
     // la schivata interrompe la carica
@@ -264,7 +275,7 @@
       if (f.g) f.vx = f.dgDir * PHYS.dodgeSpeed;
       else { f.vx = f.dgDir * PHYS.dodgeSpeed * 0.8; f.vy = Math.min(f.vy, 60); }
     } else {
-      const target = groundAttack ? 0 : mx * ch.speed;
+      const target = groundAttack ? 0 : mx * statOf(f, 'speed');
       const acc = f.g ? (Math.abs(mx) < 0.1 || groundAttack ? PHYS.friction : PHYS.accel) : PHYS.airAccel;
       f.vx = approach(f.vx, target, acc * dt);
       if (!f.att && Math.abs(mx) > 0.3) f.face = sign(mx);
@@ -276,7 +287,7 @@
           const nx = f.x + lg * dt;
           if (nx > lo + 10 && nx < hi - 10) f.vx = lg;
         } else {
-          f.vx = Math.max(-ch.speed * 1.2, Math.min(ch.speed * 1.2, f.vx + lg * 0.3));
+          { const sp = statOf(f, 'speed') * 1.2; f.vx = Math.max(-sp, Math.min(sp, f.vx + lg * 0.3)); }
         }
       }
       // spinte proprie della mossa (scatti, salite): a terra con edgeStop non si esce dalla superficie
@@ -303,11 +314,11 @@
       if (f.g || f.coyote > 0) {
         // da terra, o appena lasciato il bordo (o salto premuto poco prima di atterrare)
         f.att = null; f.buf = null;
-        f.vy = -ch.jump; f.g = false; f.jumps = PHYS.airJumps; f.coyote = 0; f.jbuf = 0;
+        f.vy = -statOf(f, 'jump'); f.g = false; f.jumps = PHYS.airJumps; f.coyote = 0; f.jbuf = 0;
       } else if (inp.j && f.jumps > 0) {
         // in aria una pressione nuova usa il doppio salto; se è già stato usato il salto resta in memoria (jbuf) e parte all'atterraggio
         f.att = null; f.buf = null;
-        f.vy = -ch.jump * PHYS.jumpMul; f.jumps -= 1; f.jbuf = 0;
+        f.vy = -statOf(f, 'jump') * PHYS.jumpMul; f.jumps -= 1; f.jbuf = 0;
       }
     }
     // scendere da una piattaforma sospesa
@@ -417,7 +428,7 @@
   const SNAP_DEFAULTS = { vx: 0, vy: 0, a: null, hs: 0, dg: 0, inv: false };
 
   const api = {
-    TICK, SEND_EVERY, SNAP_DEFAULTS, STAGE, PHYS, CHARS, MOVES, ATTACKS, COLORS, colorHex, registerChar, moveOf, SLOTS, addMeter, meterFull, inWindow, newFighter, physState, stepFighter,
+    TICK, SEND_EVERY, SNAP_DEFAULTS, STAGE, PHYS, CHARS, MOVES, ATTACKS, COLORS, colorHex, registerChar, moveOf, SLOTS, statOf, addMeter, meterFull, inWindow, newFighter, physState, stepFighter,
     hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds, lungeVelocity, chargeFrac, attackTotal,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

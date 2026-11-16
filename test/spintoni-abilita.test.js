@@ -147,3 +147,80 @@ test('tenuto: pushInput valida hb e ul', () => {
   sim.pushInput('a', { s: 4, hb: '3' });
   assert.deepStrictEqual(f.queue.map((q) => [q.hb, q.ul]), [[5, true], [0, false], [0, false], [3, false]]);
 });
+
+// ---- buff, debuff, colpi senza lancio, barre dai colpi ----
+const { Sim } = require('../games/spintoni/sim');
+const bmove = { ...mv('Buff', 2), buff: { at: 0, dur: 1, speed: 1.4 }, debuff: { dur: 3, speed: 0.6 }, noLaunch: true };
+S.registerChar({ id: 'test_bf', name: 'Bf', desc: '', stats, specials: { ...specials, light: bmove }, meter: { move: 0, hit: 1 } });
+const duel = (ca = 'test_bf', cb = 'test_ab') => {
+  const sim = new Sim({ players: [{ id: 'a', name: 'A', char: ca }, { id: 'b', name: 'B', char: cb }] });
+  return [sim, sim.fighters.get('a'), sim.fighters.get('b')];
+};
+const hitOpts = { dmg: 10, base: 300, growth: 5, ang: 0, face: 1, ty: 'light' };
+
+test('buff: aumenta la velocità per dur secondi poi finisce', () => {
+  const f = ground('test_bf');
+  assert.strictEqual(S.statOf(f, 'speed'), 500);
+  f.att = { ty: 'sp:light', dir: 'side', t: 0, air: false, id: 1, c: 0, rel: true };
+  S.stepFighter(f, idle);
+  assert.ok(Math.abs(S.statOf(f, 'speed') - 700) < 1e-9);
+  hold(f, {}, 20); // la mossa non rimette il buff
+  assert.strictEqual(f.sts.length, 1);
+  hold(f, {}, 20);
+  assert.strictEqual(S.statOf(f, 'speed'), 500);
+  assert.strictEqual(f.sts.length, 0);
+});
+
+test('buff: physState copia gli stati come oggetti nuovi', () => {
+  const f = ground('test_bf'); f.sts.push({ k: 'b', t: 1, speed: 2 });
+  const p = S.physState(f);
+  assert.deepStrictEqual(p.sts, f.sts);
+  assert.notStrictEqual(p.sts[0], f.sts[0]);
+});
+
+test('debuff: chi viene colpito rallenta', () => {
+  const [sim, a, v] = duel();
+  sim.launch(a, v, { ...hitOpts, debuff: { dur: 3, speed: 0.6 } });
+  assert.ok(Math.abs(S.statOf(v, 'speed') - 300) < 1e-9);
+  assert.strictEqual(sim.snapshot('a').f.find((x) => x.id === 'b').bf, 'd');
+  assert.strictEqual(sim.snapshot('a').f.find((x) => x.id === 'a').bf, undefined);
+});
+
+test('noLaunch: danno senza lancio', () => {
+  const [sim, a, v] = duel();
+  sim.launch(a, v, { ...hitOpts, noLaunch: true, debuff: { dur: 1, speed: 0.5 } });
+  assert.ok(v.dmg > 0);
+  assert.strictEqual(v.hs, 0);
+  assert.strictEqual(v.vx, 0);
+  assert.strictEqual(v.sts.length, 1);
+});
+
+test('barre: colpire carica chi colpisce, ricevere carica a metà', () => {
+  const [sim, a, v] = duel('test_ab_hit', 'test_ab_hit');
+  sim.launch(a, v, hitOpts);
+  assert.ok(a.mt.light > 0);
+  assert.ok(Math.abs(a.mt.light - 2 * v.mt.light) < 1e-9);
+});
+
+test('barre: la parata carica anche chi para', () => {
+  const [sim, a, v] = duel('test_ab_hit', 'test_ab_hit');
+  sim.counterHit(v, a, { dmg: 10, base: 300, growth: 5, ang: 0 });
+  assert.ok(v.mt.light > 0 && a.mt.light > 0);
+});
+
+test('snapshot: bf = bd con buff e debuff', () => {
+  const [sim, a] = duel();
+  a.sts.push({ k: 'b', t: 1 }, { k: 'd', t: 1 });
+  assert.strictEqual(sim.snapshot('a').f.find((x) => x.id === 'a').bf, 'bd');
+});
+
+test('rientro: le barre restano dopo un KO', () => {
+  const [sim, , f] = duel();
+  S.addMeter(f, 100); f.sts.push({ k: 'd', t: 9, speed: 0.5 });
+  const mt = { ...f.mt };
+  sim.ko(f);
+  for (let i = 0; i < 80 && !f.alive; i++) sim.step();
+  assert.ok(f.alive);
+  assert.deepStrictEqual(f.mt, mt);
+  assert.deepStrictEqual(f.sts, []);
+});

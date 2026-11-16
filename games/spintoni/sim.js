@@ -14,6 +14,7 @@ function roundPh(o) {
   for (const k in o) if (typeof o[k] === 'number') o[k] = r3(o[k]);
   if (o.att) { o.att.t = r3(o.att.t); o.att.c = r3(o.att.c || 0); }
   if (o.buf) o.buf.t = r3(o.buf.t);
+  for (const s of o.sts) s.t = r3(s.t);
   return o;
 }
 
@@ -141,14 +142,19 @@ class Sim {
   }
 
   // Lancio: danno, forza (base + crescita con il danno), angolo; potenza di chi colpisce e peso di chi lo subisce.
-  launch(a, v, { dmg, base, growth, ang, face, ty, p = 0, armor = false }) {
-    const ca = S.CHARS[a.char], cv = S.CHARS[v.char];
-    const d = dmg * ca.power * (1 + p);
+  launch(a, v, { dmg, base, growth, ang, face, ty, p = 0, armor = false, debuff = null, noLaunch = false }) {
+    const ca = S.CHARS[a.char];
+    const d = dmg * S.statOf(a, 'power') * (1 + p);
+    const before = v.dmg;
     v.dmg = Math.min(999, v.dmg + d);
     a.dealt += d;
+    const pts = ((v.dmg - before) / S.PHYS.meterDmg) * ca.meter.hit; // barre dal danno realmente inflitto
+    S.addMeter(a, pts);
+    S.addMeter(v, pts / 2);
+    if (debuff) v.sts.push({ k: 'd', t: debuff.dur, ...debuff });
     v.lastHitBy = a.id; v.lastHitAt = this.time;
-    const kb = (((base + growth * v.dmg) * ca.power) / cv.weight) * (1 + 0.7 * p);
-    if (armor) {
+    const kb = (((base + growth * v.dmg) * S.statOf(a, 'power')) / S.statOf(v, 'weight')) * (1 + 0.7 * p);
+    if (armor || noLaunch) {
       // corazza: il danno resta, il lancio no (e la mossa continua)
       this.events.push({ t: 'hit', id: v.id, by: a.id, x: r1(v.x), y: r1(v.y - 50), ty, kb: 0, ch: 0, arm: 1, vx: 0, vy: 0 });
       return;
@@ -168,7 +174,7 @@ class Sim {
     const box = move.boxes[att.dir] || move.boxes.side;
     const p = att.p || 0; // carica del pugno forte (0..1): fino al doppio del danno e quasi al doppio del lancio
     const ang = att.dir === 'down' && att.air && box.airAng !== undefined ? box.airAng : box.ang;
-    this.launch(a, v, { dmg: move.dmg, base: move.base, growth: move.growth, ang, face: a.face, ty: att.ty, p, armor });
+    this.launch(a, v, { dmg: move.dmg, base: move.base, growth: move.growth, ang, face: a.face, ty: att.ty, p, armor, debuff: move.debuff, noLaunch: move.noLaunch });
   }
 
   // Parata riuscita: il colpo non arriva e chi para risponde subito.
@@ -203,7 +209,7 @@ class Sim {
       if (d > bestD) { bestD = d; best = sp; }
     }
     Object.assign(f, S.newFighter(best.x, 140, f.char), {
-      alive: true, dmg: 0, inv: RESPAWN_SHIELD, lastHitBy: null, attN: f.attN,
+      alive: true, dmg: 0, inv: RESPAWN_SHIELD, lastHitBy: null, attN: f.attN, mt: f.mt,
     });
     f.queue.length = 0;
     this.events.push({ t: 'spawn', id: f.id, x: r1(f.x), y: 140 });
@@ -284,6 +290,7 @@ class Sim {
       };
       // per risparmiare banda i valori "a riposo" non si mandano (il client li rimette con SNAP_DEFAULTS)
       for (const k in SNAP_DEFAULTS) if (base[k] === SNAP_DEFAULTS[k]) delete base[k];
+      if (f.sts.length) base.bf = (f.sts.some((s) => s.k === 'b') ? 'b' : '') + (f.sts.some((s) => s.k === 'd') ? 'd' : '');
       if (f.id === viewerId) base.ph = roundPh(S.physState(f));
       fs.push(base);
     }
