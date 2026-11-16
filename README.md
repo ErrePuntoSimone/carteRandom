@@ -157,7 +157,7 @@ quattro piene). Campi in più:
 | `noLaunch` | colpisce (danno, stati) senza lanciare né interrompere |
 
 Kit di **Pepe**: *Pugno di vento* (Basico, proiettile piccolo e veloce), *Palla di fuoco* (Potenziato, proiettile lento
-e forte), *Turbo* (Schiva, per 4 s corre molto più veloce e salta più in alto), *Polverone* (Speciale, nuvola che rallenta chi ci finisce
+e forte), *Turbo* (Schiva, per 4 s corre il 40% più veloce), *Polverone* (Speciale, nuvola che rallenta chi ci finisce
 dentro) e la suprema *Tempesta di fuoco* (cinque palle di fuoco a ventaglio più il Turbo).
 
 Speciali attuali: **Pepe** *Turbine* (sale ruotando, ottima per rientrare), **Gilda** *Contrattacco* (para e risponde),

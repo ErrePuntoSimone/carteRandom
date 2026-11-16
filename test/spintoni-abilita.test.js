@@ -16,7 +16,8 @@ S.registerChar({ id: 'test_ab_hit', name: 'AbHit', desc: '', stats, specials, me
 
 test('abilità: moveOf risolve le speciali', () => {
   assert.strictEqual(S.moveOf('test_ab', 'sp:heavy').name, 'Pesante');
-  assert.ok(S.moveOf('test_ab', 'sp:heavy').boxes.side); // unita a MOVES.light
+  assert.deepStrictEqual(S.moveOf('test_ab', 'sp:heavy').boxes, {}); // senza zone proprie non colpisce in mischia
+  assert.strictEqual(S.moveOf('test_ab', 'sp:heavy').startup, 0.1);
 });
 
 test('abilità: personaggi senza specials non hanno barre', () => {
@@ -390,21 +391,24 @@ test('bot: usa la suprema e le speciali quando sono pronte', () => {
 // ---- correzioni finali ----
 const castSp = (f, slot) => { f.att = { ty: 'sp:' + slot, dir: 'side', t: 0, air: !f.g, id: 99, c: 0, rel: true }; };
 
-test('turbo: con il Turbo il triplo salto di Pepe non esce dal bordo in alto', () => {
-  const f = ground('pepe');
-  castSp(f, 'dodge'); hold(f, {}, 1);
-  assert.ok(f.sts.some((s) => s.k === 'b'));
-  f.att = null;
-  let jumps = 3, minY = f.y;
-  S.stepFighter(f, { ...idle, j: true }); jumps--;
-  for (let i = 0; i < 120; i++) {
-    const j = jumps > 0 && !f.g && f.vy >= 0; // ogni salto in aria all'apice
-    if (j) jumps--;
-    S.stepFighter(f, { ...idle, j });
-    minY = Math.min(minY, f.y);
+test('turbo: con il Turbo il triplo salto di Pepe non esce dal bordo in alto, neanche dalla piattaforma alta', () => {
+  const top = S.STAGE.plats[2];
+  for (const [x, y, onPlat] of [[800, S.STAGE.main.y, false], [top.x + top.w / 2, top.y, true]]) {
+    const f = S.newFighter(x, y, 'pepe'); f.g = true; f.onPlat = onPlat;
+    castSp(f, 'dodge'); hold(f, {}, 1);
+    assert.ok(f.sts.some((s) => s.k === 'b'));
+    f.att = null;
+    let jumps = 3, minY = f.y;
+    S.stepFighter(f, { ...idle, j: true }); jumps--;
+    for (let i = 0; i < 120; i++) {
+      const j = jumps > 0 && !f.g && f.vy >= 0; // ogni salto in aria all'apice
+      if (j) jumps--;
+      S.stepFighter(f, { ...idle, j });
+      minY = Math.min(minY, f.y);
+    }
+    assert.strictEqual(jumps, 0);
+    assert.ok(minY > S.STAGE.blast.t, `da y=${y} apice ${minY}`);
   }
-  assert.strictEqual(jumps, 0);
-  assert.ok(minY > S.STAGE.blast.t, `apice ${minY}`);
 });
 
 test('turbo: due Turbo non si sommano, il secondo rinnova il primo', () => {
@@ -453,7 +457,7 @@ test('snapshot: ph senza barre né stati vuoti, barre al millesimo e stati senza
   const pa = sim.snapshot('a').f.find((x) => x.id === 'a').ph;
   assert.ok(Object.values(pa.mt).some((v) => v > 0));
   for (const v of Object.values(pa.mt)) assert.ok(String(v).split('.')[1] === undefined || String(v).split('.')[1].length <= 3, String(v));
-  assert.deepStrictEqual(Object.keys(pa.sts[0]).sort(), ['jump', 'k', 'speed', 't']);
+  assert.deepStrictEqual(Object.keys(pa.sts[0]).sort(), ['k', 'speed', 't']);
 });
 
 test('rientro: tenere Speciale durante il Turbine in aria non fa partire il Polverone', () => {

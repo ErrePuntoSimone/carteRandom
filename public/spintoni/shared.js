@@ -76,7 +76,8 @@
       specials = {};
       for (const k of Object.keys(def.specials)) {
         const own = def.specials[k];
-        specials[k] = { ...MOVES.light, ...own, boxes: { ...MOVES.light.boxes, ...(own.boxes || {}) } };
+        // dal Basico prendono solo i tempi e il lancio: zone di colpo e passo in avanti solo se dichiarati
+        specials[k] = { ...MOVES.light, boxes: {}, lunge: null, ...own };
       }
     }
     CHARS[def.id] = { ...def.stats, name: def.name, color: def.color, desc: def.desc, specials, meter: { move: 0.5, hit: 0.5, ...(def.meter || {}) }, moves, hooks: def.hooks || {}, fx: { color: def.color, glow: '#ffffff', shape: 'dot', ...(def.fx || {}) } };
