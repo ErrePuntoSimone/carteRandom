@@ -1,5 +1,6 @@
 'use strict';
 process.env.ARENA_DURATION = '2';
+process.env.ARENA_COUNTDOWN = '0';
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const { server } = require('../server');

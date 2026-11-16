@@ -142,3 +142,19 @@ test('la partita finisce a tempo o a 10 KO; i bot giocano da soli', () => {
   }
   assert.ok(res[0].kills >= res[res.length - 1].kills);
 });
+
+test('conto alla rovescia: tutti fermi e senza spari accumulati, poi si parte', () => {
+  const sim = new Sim({ players: [{ id: 'a', name: 'A', char: 'falco' }, { id: 'b', name: 'B', char: 'falco' }], countdown: 5, rng: seeded(3) });
+  const a = sim.players.get('a');
+  const x0 = a.x;
+  sim.pushInput('a', { s: 1, mx: 1, my: 0, ax: 1, ay: 0, f: 1, u: 0 });
+  run(sim, Math.round(4.9 / A.TICK));
+  assert.ok(sim.snapshot('a').cd > 0);
+  assert.strictEqual(a.x, x0);
+  assert.strictEqual(sim.time, 0);
+  assert.strictEqual(sim.bullets.length, 0, 'nessuno sparo durante il conto');
+  run(sim, Math.round(0.4 / A.TICK));
+  assert.strictEqual(sim.snapshot('a').cd, 0);
+  run(sim, 5);
+  assert.strictEqual(sim.bullets.length, 0, 'lo sparo ignorato non parte dopo');
+});

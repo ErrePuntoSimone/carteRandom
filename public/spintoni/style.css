@@ -72,6 +72,15 @@ details.panel[open] > summary { margin-bottom: 12px; }
   font-size: 2.6rem; font-weight: 900; color: #fff; text-shadow: 0 3px 0 #b71c1c, 0 0 18px rgba(255, 82, 82, .8);
   animation: pop .5s ease-out;
 }
+.countdown {
+  position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%); pointer-events: none;
+  font-size: min(26vh, 9rem); font-weight: 900; color: #fff; line-height: 1;
+  text-shadow: 0 5px 0 rgba(0,0,0,.45), 0 0 30px rgba(255, 213, 79, .9);
+  animation: cd-pop .9s ease-out;
+}
+.countdown.go { color: #ffd54f; font-size: min(18vh, 6rem); text-shadow: 0 4px 0 #b26a00, 0 0 28px rgba(255, 152, 0, .9); }
+@keyframes cd-pop { from { transform: translate(-50%, -50%) scale(1.8); opacity: 0; } 25% { opacity: 1; } to { transform: translate(-50%, -50%) scale(1); } }
+@media (prefers-reduced-motion: reduce) { .countdown { animation: none; } }
 @keyframes pop { from { transform: translate(-50%, -50%) scale(.4); opacity: 0; } 60% { transform: translate(-50%, -50%) scale(1.15); } }
 .rotate {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);

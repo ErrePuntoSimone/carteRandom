@@ -1,5 +1,6 @@
 'use strict';
 process.env.SPINTONI_DURATION = '3';
+process.env.SPINTONI_COUNTDOWN = '0';
 const { test, before, after } = require('node:test');
 const assert = require('node:assert');
 const { server } = require('../server');
