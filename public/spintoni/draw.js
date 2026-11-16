@@ -274,6 +274,48 @@ window.SpintoniDraw = (() => {
   }
 
   // Lampo d'impatto: stella a punte che si apre e svanisce.
+  // Proiettile (kind = '<personaggio>:<abilità>'): palla luminosa nei colori fx del personaggio con la scia dietro.
+  // Il basico è una folata piccola e schiacciata, il resto una palla grande.
+  function projectile(ctx, kind, x, y, face, now) {
+    const [c, slot] = String(kind).split(':');
+    const fx = fxOf(c);
+    const small = slot === 'light';
+    const r = (small ? 13 : 28) * (1 + 0.08 * Math.sin(now / 50));
+    ctx.save();
+    for (let i = 3; i >= 1; i--) {
+      ctx.globalAlpha = 0.16 * (4 - i);
+      ctx.fillStyle = fx.color;
+      ctx.beginPath(); ctx.ellipse(x - face * r * 0.75 * i, y, r * (1 - i * 0.2) * (small ? 1.5 : 1), r * (1 - i * 0.2), 0, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 1.35);
+    g.addColorStop(0, '#ffffff'); g.addColorStop(0.35, fx.glow); g.addColorStop(0.7, fx.color); g.addColorStop(1, rgba(fx.color, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(x, y, r * 1.35 * (small ? 1.5 : 1), r * 1.35, 0, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
+  // Stato attivo sotto il lottatore: 'b' buff = alone del colore del personaggio, 'd' debuff = nuvola grigia.
+  function statusAura(ctx, x, y, bf, now, char) {
+    if (!bf) return;
+    ctx.save();
+    if (bf.includes('b')) {
+      const fx = fxOf(char);
+      const k = 0.5 + 0.5 * Math.sin(now / 120);
+      const g = ctx.createRadialGradient(x, y - 44, 10, x, y - 44, 64 + 8 * k);
+      g.addColorStop(0, rgba(fx.glow, 0)); g.addColorStop(0.6, rgba(fx.glow, 0.25 + 0.2 * k)); g.addColorStop(1, rgba(fx.color, 0));
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.ellipse(x, y - 44, 56 + 8 * k, 70 + 8 * k, 0, 0, TAU); ctx.fill();
+    }
+    if (bf.includes('d')) {
+      ctx.fillStyle = 'rgba(150, 150, 150, .4)';
+      for (let i = 0; i < 7; i++) {
+        const a = now / 700 + (i * TAU) / 7;
+        ctx.beginPath(); ctx.arc(x + Math.cos(a) * 30, y - 20 - (i % 3) * 22 + Math.sin(a * 2) * 5, 14 + 4 * Math.sin(now / 200 + i), 0, TAU); ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
   function impact(ctx, x, y, r, k, color) {
     const n = 8, rr0 = r * (0.6 + 0.6 * k);
     ctx.save();
@@ -577,5 +619,5 @@ window.SpintoniDraw = (() => {
     return '#e53935';
   }
 
-  return { sky, makeScene, mapReady: () => map.ready, paint: { scenery: paintScenery, island: paintIsland, platform: paintPlatform }, SCENE, fighter, portrait, dmgColor, SLOT_COLORS, fxOf, particle, impact };
+  return { sky, makeScene, mapReady: () => map.ready, paint: { scenery: paintScenery, island: paintIsland, platform: paintPlatform }, SCENE, fighter, portrait, dmgColor, SLOT_COLORS, fxOf, particle, impact, projectile, statusAura };
 })();

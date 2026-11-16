@@ -103,7 +103,7 @@ details.panel[open] > summary { margin-bottom: 12px; }
 .pbtn.on { transform: scale(.92); filter: brightness(1.3); }
 .pbtn.jump { right: 0; bottom: 0; width: 82px; height: 82px; background: rgba(76, 175, 80, .75); }
 .pbtn.light { right: 92px; bottom: 6px; width: 72px; height: 72px; background: rgba(255, 152, 0, .8); }
-.pbtn.heavy { right: 86px; bottom: 88px; width: 72px; height: 72px; background: rgba(229, 57, 53, .85); }
+.pbtn.heavy { right: 86px; bottom: 88px; width: 72px; height: 72px; background: rgba(229, 57, 53, .85); font-size: .54rem; }
 .pbtn.dodge { right: 8px; bottom: 96px; width: 60px; height: 60px; background: rgba(66, 165, 245, .75); font-size: .6rem; }
 .pbtn.special { right: 170px; bottom: 52px; width: 66px; height: 66px; background: rgba(255, 193, 7, .85); color: #3e2723; font-size: .56rem; overflow: hidden; }
 /* ricarica: velo scuro che si svuota e secondi rimanenti */
@@ -112,6 +112,27 @@ details.panel[open] > summary { margin-bottom: 12px; }
   content: attr(data-cd); position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%;
   font-size: 1.1rem; color: #fff; background: conic-gradient(rgba(0,0,0,.6) calc(var(--cd, 0) * 360deg), transparent 0);
 }
+/* barre delle speciali: anello che si riempie attorno al pulsante (--m 0..1), lampeggia quando è piena */
+.pbtn.mt::before {
+  content: ""; position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
+  background: conic-gradient(#fff calc(var(--m, 0) * 360deg), rgba(0,0,0,.35) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #000 calc(100% - 4px));
+}
+.pbtn.mt.full { box-shadow: 0 0 12px 3px rgba(255, 235, 59, .8), 0 4px 10px rgba(0,0,0,.35); }
+.pbtn.mt.full::before { background: #ffeb3b; }
+.pbtn.ult {
+  right: 170px; bottom: 122px; width: 58px; height: 58px; font-size: .6rem;
+  background: radial-gradient(circle, #fff176, #ff6f00); color: #3e2723; animation: ult-pulse .7s ease-in-out infinite alternate;
+}
+@keyframes ult-pulse { to { transform: scale(1.12); box-shadow: 0 0 18px 6px rgba(255, 193, 7, .9); } }
+@media (prefers-reduced-motion: reduce) { .pbtn.ult { animation: none; } }
+.sp-ind .mb {
+  display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 6px; font-size: .7rem; color: #fff;
+  background: linear-gradient(90deg, rgba(255, 112, 67, .9) calc(var(--m, 0) * 100%), rgba(0,0,0,.35) 0);
+}
+.sp-ind .mb.full { background: #ff7043; box-shadow: 0 0 6px #ffeb3b; }
+.sp-ind .mb.ul { background: #ff6f00; }
 .sp-ind {
   position: absolute; left: calc(12px + env(safe-area-inset-left)); bottom: 28px; padding: 4px 10px; border-radius: 999px;
   background: rgba(0,0,0,.5); font-size: .8rem; font-weight: 700; pointer-events: none; display: none;

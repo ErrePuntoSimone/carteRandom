@@ -26,6 +26,7 @@
     chargeMax: 2, // secondi massimi di carica del pugno forte
     chargeRecovery: 0.7, // fermo in più dopo un forte caricato: proporzionale alla carica (massimo, a carica piena)
     airJumps: 2, // salti in aria disponibili dopo aver lasciato il suolo
+    holdSpecial: 0.35, meterDist: 400, meterDmg: 10, // tenuta per la speciale (s) / distanza (unità) e danno (%) che valgono 1 punto barra
     coyote: 0.1, jumpBuffer: 0.12, // salto ancora possibile appena lasciato il bordo / salto premuto poco prima di atterrare
   };
 
@@ -70,24 +71,63 @@
       moves[ty] = { ...(base || {}), ...(own || {}) };
       moves[ty].boxes = { ...((base && base.boxes) || {}), ...((own && own.boxes) || {}) };
     }
-    CHARS[def.id] = { ...def.stats, name: def.name, color: def.color, desc: def.desc, moves, hooks: def.hooks || {}, fx: { color: def.color, glow: '#ffffff', shape: 'dot', ...(def.fx || {}) } };
+    let specials = null; // mosse nascoste (tenuta, schivata, speciale, suprema) con le loro barre: opzionali
+    if (def.specials) {
+      specials = {};
+      for (const k of Object.keys(def.specials)) {
+        const own = def.specials[k];
+        // dal Basico prendono solo i tempi e il lancio: zone di colpo e passo in avanti solo se dichiarati
+        specials[k] = { ...MOVES.light, boxes: {}, lunge: null, ...own };
+      }
+    }
+    CHARS[def.id] = { ...def.stats, name: def.name, color: def.color, desc: def.desc, specials, meter: { move: 0.5, hit: 0.5, ...(def.meter || {}) }, moves, hooks: def.hooks || {}, fx: { color: def.color, glow: '#ffffff', shape: 'dot', ...(def.fx || {}) } };
   }
   const charDefs = typeof module !== 'undefined' && module.exports
     ? require('./chars/index.json').map((id) => require(`./chars/${id}.js`))
     : root.SpintoniCharDefs || [];
   for (const d of charDefs) registerChar(d);
   const DEFAULT_CHAR = CHARS.gilda ? 'gilda' : Object.keys(CHARS)[0];
-  const moveOf = (char, ty) => ((CHARS[char] || CHARS[DEFAULT_CHAR]).moves[ty]) || MOVES.light;
+  const SLOTS = ['light', 'heavy', 'dodge', 'special'];
+  const moveOf = (char, ty) => {
+    const c = CHARS[char] || CHARS[DEFAULT_CHAR];
+    if (ty.startsWith('sp:')) return (c.specials && c.specials[ty.slice(3)]) || MOVES.light;
+    return c.moves[ty] || MOVES.light;
+  };
+  // barre delle abilità: ognuna sale fino al charge della sua speciale
+  function addMeter(f, points) {
+    if (!f.mt) return;
+    const sp = CHARS[f.char].specials;
+    for (const k of SLOTS) f.mt[k] = Math.min(sp[k].charge, f.mt[k] + points);
+  }
+  // buff e debuff attivi: ogni stato moltiplica la statistica (senza stati, il valore base esatto)
+  function statOf(f, key) {
+    let v = CHARS[f.char][key];
+    for (const s of f.sts) if (s[key] !== undefined) v *= s[key];
+    return v;
+  }
+  // un buff (o debuff) nuovo rinnova quello dello stesso tipo invece di sommarsi; si tengono solo t e i moltiplicatori
+  function addStatus(f, k, { at, dur, ...mul }) {
+    f.sts = f.sts.filter((s) => s.k !== k);
+    f.sts.push({ k, t: dur, ...mul });
+  }
+  const meterFull = (f, slot) => !!f.mt && f.mt[slot] >= CHARS[f.char].specials[slot].charge;
 
   const sign = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
   const approach = (v, target, step) => (v < target ? Math.min(target, v + step) : Math.max(target, v - step));
 
   function newFighter(x, y, char) {
-    return {
+    const f = {
       x, y, vx: 0, vy: 0, face: 1, g: false, onPlat: false, jumps: PHYS.airJumps,
       att: null, attN: 0, buf: null, hs: 0, dg: 0, dgDir: 0, dodgeCd: 0, spCd: 0, inv: 0, drop: 0, coyote: 0, jbuf: 0,
       char: CHARS[char] ? char : DEFAULT_CHAR,
+      mt: null, ht: null, spArm: null, sts: [],
     };
+    if (CHARS[f.char].specials) {
+      f.mt = { light: 0, heavy: 0, dodge: 0, special: 0 };
+      f.ht = { light: 0, heavy: 0, dodge: 0, special: 0 }; // secondi di pressione continua
+      f.spArm = { light: true, heavy: true, dodge: true, special: true }; // questa pressione può ancora far partire la speciale
+    }
+    return f;
   }
 
   // Copia solo i campi di fisica (per la previsione sul telefono).
@@ -95,7 +135,11 @@
   function physState(f) {
     const o = {};
     for (const k of FIELDS) o[k] = f[k];
-    o.att = f.att ? { ty: f.att.ty, dir: f.att.dir, t: f.att.t, air: f.att.air, id: f.att.id, c: f.att.c, rel: f.att.rel } : null;
+    o.att = f.att ? { ty: f.att.ty, dir: f.att.dir, t: f.att.t, air: f.att.air, id: f.att.id, c: f.att.c, rel: f.att.rel, bf: f.att.bf } : null;
+    o.mt = f.mt ? { ...f.mt } : null;
+    o.ht = f.ht ? { ...f.ht } : null;
+    o.spArm = f.spArm ? { ...f.spArm } : null;
+    o.sts = f.sts.map((s) => ({ ...s }));
     o.buf = f.buf ? { ty: f.buf.ty, t: f.buf.t } : null;
     return o;
   }
@@ -120,7 +164,7 @@
   function hitbox(f) {
     if (!isActive(f)) return null;
     const b = moveOf(f.char, f.att.ty).boxes[f.att.dir];
-    if (!b) return null;
+    if (!b || !b.w || !b.h) return null; // zona vuota (speciali senza colpo in mischia): nessun colpo
     const x = f.face > 0 ? f.x + b.x : f.x - b.x - b.w;
     return { x, y: f.y + b.y, w: b.w, h: b.h };
   }
@@ -165,7 +209,8 @@
 
   /**
    * Un passo di fisica.
-   * inp: { mx (-1..1), up, down, hd (tenuti premuti), j, l, h, sp, d, dd (premuti in questo passo) }
+   * inp: { mx (-1..1), up, down, hd, hb (tenuti premuti; hb: 1 Basico, 2 Potenziato, 4 Schiva, 8 Speciale),
+   *        j, l, h, sp, d, dd, ul (premuti in questo passo) }
    */
   function stepFighter(f, inp, dt = TICK) {
     const ch = CHARS[f.char];
@@ -174,6 +219,8 @@
     f.dodgeCd = Math.max(0, f.dodgeCd - dt);
     f.spCd = Math.max(0, (f.spCd || 0) - dt);
     f.drop = Math.max(0, f.drop - dt);
+    for (const s of f.sts) s.t -= dt;
+    if (f.sts.length) f.sts = f.sts.filter((s) => s.t > 0);
 
     if (f.hs > 0) {
       // in volo dopo un colpo: nessun controllo
@@ -198,11 +245,14 @@
         if (inp.hd && a.c < PHYS.chargeMax) { a.c = Math.min(PHYS.chargeMax, a.c + dt); a.t = m.startup - 0.001; }
         else { a.rel = true; a.t += dt; }
       } else a.t += dt;
+      // il buff della mossa parte una volta sola, quando si supera il suo istante
+      if (m.buff && !a.bf && a.t >= m.buff.at) { a.bf = true; addStatus(f, 'b', m.buff); }
       if (a.t >= attackTotal(f)) f.att = null;
     }
     // la schivata interrompe la carica
     if (f.att && !f.att.rel && f.att.c > 0 && inp.d && f.dodgeCd <= 0) f.att = null;
     if (f.dg > 0) f.dg = Math.max(0, f.dg - dt);
+    if (f.mt) holdSpecials(f, inp, dt);
     if (inp.l) f.buf = { ty: 'light', t: PHYS.buffer };
     if (inp.h) f.buf = { ty: 'heavy', t: PHYS.buffer };
     if (inp.sp && f.spCd <= 0 && CHARS[f.char].moves.special) f.buf = { ty: 'special', t: PHYS.buffer };
@@ -231,7 +281,7 @@
       if (f.g) f.vx = f.dgDir * PHYS.dodgeSpeed;
       else { f.vx = f.dgDir * PHYS.dodgeSpeed * 0.8; f.vy = Math.min(f.vy, 60); }
     } else {
-      const target = groundAttack ? 0 : mx * ch.speed;
+      const target = groundAttack ? 0 : mx * statOf(f, 'speed');
       const acc = f.g ? (Math.abs(mx) < 0.1 || groundAttack ? PHYS.friction : PHYS.accel) : PHYS.airAccel;
       f.vx = approach(f.vx, target, acc * dt);
       if (!f.att && Math.abs(mx) > 0.3) f.face = sign(mx);
@@ -243,7 +293,7 @@
           const nx = f.x + lg * dt;
           if (nx > lo + 10 && nx < hi - 10) f.vx = lg;
         } else {
-          f.vx = Math.max(-ch.speed * 1.2, Math.min(ch.speed * 1.2, f.vx + lg * 0.3));
+          { const sp = statOf(f, 'speed') * 1.2; f.vx = Math.max(-sp, Math.min(sp, f.vx + lg * 0.3)); }
         }
       }
       // spinte proprie della mossa (scatti, salite): a terra con edgeStop non si esce dalla superficie
@@ -270,11 +320,11 @@
       if (f.g || f.coyote > 0) {
         // da terra, o appena lasciato il bordo (o salto premuto poco prima di atterrare)
         f.att = null; f.buf = null;
-        f.vy = -ch.jump; f.g = false; f.jumps = PHYS.airJumps; f.coyote = 0; f.jbuf = 0;
+        f.vy = -statOf(f, 'jump'); f.g = false; f.jumps = PHYS.airJumps; f.coyote = 0; f.jbuf = 0;
       } else if (inp.j && f.jumps > 0) {
         // in aria una pressione nuova usa il doppio salto; se è già stato usato il salto resta in memoria (jbuf) e parte all'atterraggio
         f.att = null; f.buf = null;
-        f.vy = -ch.jump * PHYS.jumpMul; f.jumps -= 1; f.jbuf = 0;
+        f.vy = -statOf(f, 'jump') * PHYS.jumpMul; f.jumps -= 1; f.jbuf = 0;
       }
     }
     // scendere da una piattaforma sospesa
@@ -284,8 +334,42 @@
     const maxFall = inp.down && !f.g && f.vy > 0 ? PHYS.fastFall : PHYS.maxFall;
     f.vy = Math.min(f.vy + PHYS.g * dt, maxFall);
     if (inp.down && !f.g && f.vy > 0) f.vy = Math.max(f.vy, PHYS.fastFall * 0.75);
+    const x0 = f.x, y0 = f.y;
     integrate(f, dt, true);
+    // le speciali che spostano (scatti, affondi) non ricaricano le barre che hanno appena svuotato
+    if (!(f.att && f.att.ty.startsWith('sp:'))) addMeter(f, Math.hypot(f.x - x0, f.y - y0) / PHYS.meterDist * ch.meter.move);
     return f;
+  }
+
+  // Tocco e tenuto: il tocco ha già fatto partire la mossa base; tenendo oltre holdSpecial con la barra piena
+  // parte la speciale al suo posto. Una barra riempita a pressione già lunga aspetta la pressione successiva.
+  function holdSpecials(f, inp, dt) {
+    const hb = inp.hb | 0;
+    SLOTS.forEach((slot, i) => {
+      if (!(hb & (1 << i))) { f.ht[slot] = 0; f.spArm[slot] = true; return; }
+      const prev = f.ht[slot];
+      f.ht[slot] += dt;
+      if (prev > PHYS.holdSpecial || f.ht[slot] <= PHYS.holdSpecial) return;
+      // Potenziato tenuto da solo resta il pugno caricato: la sua speciale vuole anche giù;
+      // Speciale tenuta mentre si rientra in aria (mossa con recover) non interrompe il rientro
+      const rientro = slot === 'special' && f.att && f.att.air && moveOf(f.char, f.att.ty).recover;
+      if (f.spArm[slot] && meterFull(f, slot) && (slot !== 'heavy' || inp.down) && !rientro) {
+        f.mt[slot] = 0;
+        startSpecial(f, 'sp:' + slot);
+      }
+      f.spArm[slot] = false;
+    });
+    if (inp.ul && SLOTS.every((k) => meterFull(f, k))) {
+      for (const k of SLOTS) f.mt[k] = 0;
+      startSpecial(f, 'sp:ultimate');
+    }
+  }
+  // la speciale interrompe la mossa base o la schivata in corso
+  function startSpecial(f, ty) {
+    f.attN += 1;
+    f.att = { ty, dir: 'side', t: 0, air: !f.g, id: f.attN, c: 0, rel: true };
+    f.dg = 0;
+    f.buf = null;
   }
 
   function integrate(f, dt) {
@@ -352,7 +436,7 @@
   const SNAP_DEFAULTS = { vx: 0, vy: 0, a: null, hs: 0, dg: 0, inv: false };
 
   const api = {
-    TICK, SEND_EVERY, SNAP_DEFAULTS, STAGE, PHYS, CHARS, MOVES, ATTACKS, COLORS, colorHex, registerChar, moveOf, inWindow, newFighter, physState, stepFighter,
+    TICK, SEND_EVERY, SNAP_DEFAULTS, STAGE, PHYS, CHARS, MOVES, ATTACKS, COLORS, colorHex, registerChar, moveOf, SLOTS, statOf, addMeter, addStatus, meterFull, inWindow, newFighter, physState, stepFighter,
     hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds, lungeVelocity, chargeFrac, attackTotal,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
