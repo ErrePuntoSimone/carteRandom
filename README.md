@@ -10,6 +10,7 @@ Il nome si cambia dalla home o dal link "Cambia nome" dentro ai giochi.
 | ♠️ **Poker** | `/poker/` | Multiplayer: gestisce una partita intera con le carte vere (turni, dealer, bui, puntate, fiches) |
 | 🏆 **Briscola** | `/briscola/` | Multiplayer: briscola con il mazzo napoletano, in 2 o in 4 a coppie |
 | 💥 **Rissa** | `/arena/` | Multiplayer d'azione in tempo reale: arena vista dall'alto, tutti contro tutti, anche con bot |
+| 🥊 **Spintoni** | `/spintoni/` | Multiplayer d'azione: picchiaduro su piattaforme, butta fuori gli avversari a pugni |
 | 🪙 **Conta fiches** | `/fiches/` | Conta le fiches di ogni giocatore a poker e calcola chi paga chi |
 
 ## Carte Random
@@ -79,6 +80,21 @@ Partite da 2 minuti: vince chi fa più KO, o il primo che ne fa 10.
   il proprio movimento con lo stesso codice (`public/arena/shared.js`) e mostra gli altri in modo fluido interpolando gli
   aggiornamenti. La partita viaggia su WebSocket (`lib/ws.js`, scritto senza dipendenze), la sala d'attesa sulle stanze comuni.
 
+## Spintoni
+
+Picchiaduro su piattaforme in tempo reale, da 2 a 4 lottatori (persone o bot). L'arena è grande quanto lo schermo:
+un'isola galleggiante e tre piattaforme sospese. Lo scopo è buttare fuori dallo schermo gli avversari a pugni.
+
+- **Percentuale di danno:** ogni pugno la fa salire; più è alta, più lontano si vola. Si perde una vita uscendo dai bordi,
+  si rientra dall'alto con qualche istante di protezione. Vince l'ultimo che resta (vite da 1 a 5, scelte dall'host).
+- **Attacchi:** *pugno* veloce e *forte* lento ma potente, in avanti, verso l'alto o verso il basso (tenendo su o giù).
+  In più un salto da terra e uno in aria, la discesa dalle piattaforme e la *schivata* che rende intoccabili per un attimo.
+- **Lottatori originali:** *Pepe* (leggero e veloce), *Gilda* (equilibrata) e *Tonno* (pesante e potente).
+- **Controlli:** sul telefono in orizzontale joystick a sinistra e pulsanti Salta, Pugno, Forte, Schiva a destra;
+  sul computer A/D o frecce, W/↑/spazio per saltare, S/↓ giù, J pugno, K forte, L o Maiusc schiva.
+- **Rete:** come Rissa, il server simula a 30 passi al secondo e decide i colpi; il telefono prevede la propria fisica
+  con lo stesso codice (`public/spintoni/shared.js`) e la riallinea a quella del server.
+
 ## Conta fiches
 
 Funziona su un solo dispositivo, senza server: i dati restano salvati nel browser.
@@ -112,6 +128,7 @@ games/poker/engine.js  regole del poker (puro, testato a parte)
 games/poker/server.js  API del poker sopra lib/rooms.js
 games/briscola/        regole (engine.js) e API (server.js) della Briscola
 games/arena/           simulazione (sim.js) e server in tempo reale (server.js) di Rissa
+games/spintoni/        simulazione e server in tempo reale di Spintoni
 lib/ws.js              WebSocket minimo per i giochi in tempo reale
 public/index.html      menu dei minigiochi
 public/common.css      stile condiviso
@@ -120,6 +137,7 @@ public/carte/          interfaccia di Carte Random
 public/poker/          interfaccia del Poker
 public/briscola/       interfaccia della Briscola
 public/arena/          Rissa: codice condiviso, disegno su canvas e interfaccia
+public/spintoni/       Spintoni: fisica condivisa, disegno su canvas e interfaccia
 public/fiches/         Conta fiches (solo lato browser)
 test/                  test automatici
 ```

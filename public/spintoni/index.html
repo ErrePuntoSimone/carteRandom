@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0f5132">
+  <title>Spintoni · Minigiochi</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥊</text></svg>">
+  <link rel="stylesheet" href="/common.css">
+  <link rel="stylesheet" href="/spintoni/style.css">
+</head>
+<body>
+  <main id="app">
+    <!-- HOME -->
+    <section id="screen-home" hidden>
+      <a class="back" href="/">← Menu</a>
+      <header class="hero">
+        <div class="logo">🥊</div>
+        <h1>Spintoni</h1>
+        <p class="sub">Picchiaduro su piattaforme: butta fuori gli avversari a suon di pugni.</p>
+      </header>
+
+      <div class="panel who">
+        <span>Giochi come <strong id="who-name"></strong></span>
+        <a id="link-change" class="linkish" href="/">Cambia nome</a>
+      </div>
+
+      <div id="invite" class="panel invite" hidden>
+        <div class="invite-title">Sei stato invitato! 🎉</div>
+        <div class="invite-code" id="invite-code" aria-label="Codice"></div>
+        <button id="btn-join-invite" class="btn primary block cta" type="button">Entra nell'arena</button>
+        <p class="muted small center">Non volevi entrare in questa arena? <button id="btn-show-create" class="linkish small" type="button">crea una nuova arena</button></p>
+      </div>
+
+      <div id="home-main">
+        <div class="panel">
+          <button id="btn-create" class="btn primary block">Crea un'arena</button>
+        </div>
+        <form id="form-join" class="panel" autocomplete="off">
+          <label for="input-code">Hai un codice?</label>
+          <div class="row">
+            <input id="input-code" maxlength="5" placeholder="ABCDE" class="code-input" autocapitalize="characters" spellcheck="false">
+            <button class="btn" type="submit">Entra</button>
+          </div>
+        </form>
+      </div>
+      <p id="home-error" class="error" role="alert"></p>
+    </section>
+
+    <!-- SALA D'ATTESA -->
+    <section id="screen-lobby" hidden>
+      <header class="room-head">
+        <div>
+          <span class="muted small">Arena</span>
+          <div class="room-code" id="room-code">-----</div>
+        </div>
+        <div class="head-actions">
+          <button id="btn-share" class="btn small">Invita</button>
+          <button id="btn-leave" class="btn small ghost">Esci</button>
+        </div>
+      </header>
+      <div id="conn-banner" class="banner" hidden>Riconnessione…</div>
+
+      <div id="results" class="panel" hidden>
+        <h2 id="results-title">Classifica</h2>
+        <ol id="results-list" class="ranking"></ol>
+      </div>
+
+      <div class="panel">
+        <h2>Scegli il tuo lottatore</h2>
+        <div id="chars" class="chars"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Lottatori <span id="roster-count" class="pill"></span></h2>
+        <ul id="roster" class="roster"></ul>
+        <div id="host-tools" class="host-tools" hidden>
+          <button id="btn-add-bot" class="btn small">+ Aggiungi un bot</button>
+          <label class="stocks">Vite
+            <select id="sel-stocks">
+              <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+            </select>
+          </label>
+        </div>
+        <button id="btn-start" class="btn primary block">▶ Inizia lo scontro</button>
+        <p id="start-hint" class="muted small center"></p>
+      </div>
+
+      <details class="panel">
+        <summary><h2>Come si gioca</h2></summary>
+        <ul class="howto">
+          <li>Ogni colpo aumenta la <strong>percentuale di danno</strong> dell'avversario: più è alta, più vola lontano.</li>
+          <li>Buttalo fuori dallo schermo per togliergli una <strong>vita</strong>. Vince l'ultimo che resta.</li>
+          <li><strong>Pugno</strong> è veloce, <strong>Forte</strong> è lento ma lancia molto di più. Tieni su o giù mentre colpisci per colpire verso l'alto o verso il basso.</li>
+          <li>Hai un salto da terra e uno in aria. Tieni giù sulle piattaforme sospese per scendere. <strong>Schiva</strong> ti rende intoccabile per un attimo.</li>
+          <li><strong>Telefono</strong> (in orizzontale): joystick a sinistra, pulsanti a destra.</li>
+          <li><strong>Computer</strong>: A/D o frecce per muoverti, W/↑/spazio salto, S/↓ giù, J pugno, K forte, L o Maiusc schiva.</li>
+        </ul>
+      </details>
+      <p id="room-error" class="error center" role="alert"></p>
+    </section>
+  </main>
+
+  <!-- PARTITA -->
+  <section id="screen-game" class="game" hidden>
+    <canvas id="canvas"></canvas>
+    <div class="hud-top">
+      <button id="btn-quit" class="hud-btn" aria-label="Esci dalla partita">✕</button>
+      <div class="cards" id="cards"></div>
+      <div class="timer" id="timer">4:00</div>
+    </div>
+    <div class="banner-ko" id="banner" hidden></div>
+    <div class="rotate" id="rotate-hint">↻ Gira il telefono in orizzontale</div>
+    <div class="pad" id="pad">
+      <button class="pbtn dodge" data-act="d">SCHIVA</button>
+      <button class="pbtn heavy" data-act="h">FORTE</button>
+      <button class="pbtn light" data-act="l">PUGNO</button>
+      <button class="pbtn jump" data-act="j">SALTA</button>
+    </div>
+    <div class="desk-help">A/D muovi · W o spazio salta · S giù · J pugno · K forte · L schiva</div>
+  </section>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+  <script src="/common.js"></script>
+  <script src="/spintoni/shared.js"></script>
+  <script src="/spintoni/draw.js"></script>
+  <script src="/spintoni/app.js"></script>
+</body>
+</html>

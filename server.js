@@ -9,6 +9,7 @@ const carte = require('./games/carte/server');
 const poker = require('./games/poker/server');
 const briscola = require('./games/briscola/server');
 const arena = require('./games/arena/server');
+const spintoni = require('./games/spintoni/server');
 
 const PORT = Number(process.env.PORT) || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -19,6 +20,7 @@ const API = {
   poker: poker.handleApi,
   briscola: briscola.handleApi,
   arena: arena.handleApi,
+  spintoni: spintoni.handleApi,
 };
 
 const MIME = {
@@ -66,7 +68,7 @@ function serveStatic(res, pathname) {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
-    if (url.pathname === '/healthz') return sendJson(res, 200, { ok: true, rooms: carte.rooms.size + poker.rooms.size + briscola.rooms.size + arena.rooms.size });
+    if (url.pathname === '/healthz') return sendJson(res, 200, { ok: true, rooms: carte.rooms.size + poker.rooms.size + briscola.rooms.size + arena.rooms.size + spintoni.rooms.size });
     if (url.pathname.startsWith('/api/')) {
       const [, game, ...parts] = url.pathname.split('/').filter(Boolean);
       const handler = API[game];
@@ -91,6 +93,7 @@ const server = http.createServer(async (req, res) => {
 // WebSocket per i giochi in tempo reale: /api/<gioco>/...
 const UPGRADE = {
   arena: arena.handleUpgrade,
+  spintoni: spintoni.handleUpgrade,
 };
 server.on('upgrade', (req, socket, head) => {
   socket.on('error', () => {});

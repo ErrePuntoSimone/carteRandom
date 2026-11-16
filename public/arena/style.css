@@ -49,7 +49,7 @@ details.panel[open] > summary { margin-bottom: 12px; }
   position: fixed; inset: 0; z-index: 40; background: #0b2e1e; overflow: hidden;
   touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
-.game canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 .hud-top {
   position: absolute; top: calc(8px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left)); right: calc(8px + env(safe-area-inset-right));
   display: flex; align-items: flex-start; gap: 8px; pointer-events: none;
