@@ -15,7 +15,8 @@ function roundPh(o) {
   if (o.att) { o.att.t = r3(o.att.t); o.att.c = r3(o.att.c || 0); }
   if (o.buf) o.buf.t = r3(o.buf.t);
   for (const s of o.sts) s.t = r3(s.t);
-  for (const k of ['mt', 'ht']) if (o[k]) for (const s in o[k]) o[k][s] = r3(o[k][s]);
+  // per difetto: una barra a 3,9996 non deve arrivare al telefono come piena
+  for (const k of ['mt', 'ht']) if (o[k]) for (const s in o[k]) o[k][s] = Math.floor(o[k][s] * 1000) / 1000;
   // campi vuoti non mandati: il telefono li rimette prima di riapplicare gli input (vedi app.js)
   for (const k of ['mt', 'ht', 'spArm']) if (o[k] === null) delete o[k];
   if (!o.sts.length) delete o.sts;
