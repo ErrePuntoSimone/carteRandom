@@ -18,21 +18,15 @@ window.SpintoniDraw = (() => {
     ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
   }
 
-  // ---------- sfondo (coordinate dello schermo) ----------
-  function sky(ctx, W, H) {
-    const g = ctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, '#22315c'); g.addColorStop(0.55, '#6a4c8c'); g.addColorStop(1, '#f39c6b');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, W, H);
-  }
-
   // ---------- scena nel mondo (disegnata una volta su un canvas grande) ----------
-  function makeScene() {
-    const pad = 400;
-    const c = document.createElement('canvas');
-    c.width = STAGE.w + pad * 2; c.height = STAGE.h + pad;
-    const g = c.getContext('2d');
-    g.translate(pad, pad * 0.5);
+  // La mappa si può personalizzare con i PNG di public/spintoni/maps/<mappa>/ (vedi map.json):
+  // se mancano o non si caricano, si usa il disegno a codice qui sotto.
+  const PAD = 400;
+  const SCENE = { w: STAGE.w + PAD * 2, h: STAGE.h + PAD, ox: -PAD, oy: -PAD * 0.5 };
+
+  // sole, nuvole e colline (coordinate del mondo, già traslate di -ox/-oy)
+  function paintScenery(g) {
+    const pad = PAD;
     // sole
     const sun = g.createRadialGradient(1220, 250, 10, 1220, 250, 190);
     sun.addColorStop(0, 'rgba(255, 236, 179, .95)'); sun.addColorStop(0.35, 'rgba(255, 183, 77, .6)'); sun.addColorStop(1, 'rgba(255, 183, 77, 0)');
@@ -50,8 +44,9 @@ window.SpintoniDraw = (() => {
     };
     hills(720, 130, 'rgba(70, 48, 105, .55)', 1);
     hills(800, 90, 'rgba(48, 36, 82, .7)', 3);
+  }
 
-    // isola principale
+  function paintIsland(g) {
     const m = STAGE.main;
     g.fillStyle = '#5d4037';
     g.beginPath();
@@ -73,17 +68,63 @@ window.SpintoniDraw = (() => {
     g.fillStyle = '#66bb6a'; rr(g, m.x - 8, m.y - 6, m.w + 16, 12, 6); g.fill();
     g.fillStyle = '#2e7d32';
     for (let x = m.x; x < m.x + m.w; x += 22) { g.beginPath(); g.moveTo(x, m.y + 20); g.lineTo(x + 8, m.y + 34); g.lineTo(x + 16, m.y + 20); g.fill(); }
+  }
 
-    // piattaforme sospese
+  function paintPlatform(g, p) {
+    g.fillStyle = 'rgba(0,0,0,.25)'; rr(g, p.x + 6, p.y + 10, p.w, 22, 10); g.fill();
+    g.fillStyle = '#8d6e63'; rr(g, p.x, p.y + 2, p.w, 20, 9); g.fill();
+    g.fillStyle = '#a1887f'; rr(g, p.x, p.y, p.w, 10, 6); g.fill();
+    g.strokeStyle = 'rgba(62, 39, 35, .6)'; g.lineWidth = 2;
+    for (let x = p.x + 40; x < p.x + p.w - 10; x += 42) { g.beginPath(); g.moveTo(x, p.y + 3); g.lineTo(x, p.y + 20); g.stroke(); }
+    g.fillStyle = '#7cb342'; rr(g, p.x - 4, p.y - 4, p.w + 8, 8, 4); g.fill();
+  }
+
+  // mappa a PNG: map.json + immagini (facoltativi)
+  const MAP_DIR = '/spintoni/maps/default/';
+  const map = { meta: null, img: {}, ready: false };
+  function loadMap() {
+    fetch(MAP_DIR + 'map.json').then((r) => (r.ok ? r.json() : Promise.reject(new Error('map')))).then((meta) => {
+      const names = new Set([meta.sky, meta.scenery && meta.scenery.img, meta.island && meta.island.img, meta.platform && meta.platform.img].filter(Boolean));
+      return Promise.all([...names].map((n) => new Promise((resolve) => {
+        const im = new Image();
+        im.onload = () => { map.img[n] = im; resolve(); };
+        im.onerror = () => resolve();
+        im.src = MAP_DIR + n;
+      }))).then(() => { map.meta = meta; map.ready = true; });
+    }).catch(() => { /* senza PNG si usa il disegno a codice */ });
+  }
+  loadMap();
+  const mapImg = (n) => (map.ready && n && map.img[n]) || null;
+
+  function sky(ctx, W, H) {
+    const im = map.meta && mapImg(map.meta.sky);
+    if (im) { ctx.drawImage(im, 0, 0, W, H); return; }
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#22315c'); g.addColorStop(0.55, '#6a4c8c'); g.addColorStop(1, '#f39c6b');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function makeScene() {
+    const c = document.createElement('canvas');
+    c.width = SCENE.w; c.height = SCENE.h;
+    const g = c.getContext('2d');
+    g.translate(PAD, PAD * 0.5);
+    const M = map.ready && map.meta;
+    const place = (spec, fallback) => {
+      const im = spec && mapImg(spec.img);
+      if (im) g.drawImage(im, spec.x, spec.y, spec.w, spec.h); else fallback();
+      return !!im;
+    };
+    let usedPng = false;
+    usedPng = place(M && M.scenery, () => paintScenery(g)) || usedPng;
+    usedPng = place(M && M.island, () => paintIsland(g)) || usedPng;
+    const pl = M && M.platform && mapImg(M.platform.img);
     for (const p of STAGE.plats) {
-      g.fillStyle = 'rgba(0,0,0,.25)'; rr(g, p.x + 6, p.y + 10, p.w, 22, 10); g.fill();
-      g.fillStyle = '#8d6e63'; rr(g, p.x, p.y + 2, p.w, 20, 9); g.fill();
-      g.fillStyle = '#a1887f'; rr(g, p.x, p.y, p.w, 10, 6); g.fill();
-      g.strokeStyle = 'rgba(62, 39, 35, .6)'; g.lineWidth = 2;
-      for (let x = p.x + 40; x < p.x + p.w - 10; x += 42) { g.beginPath(); g.moveTo(x, p.y + 3); g.lineTo(x, p.y + 20); g.stroke(); }
-      g.fillStyle = '#7cb342'; rr(g, p.x - 4, p.y - 4, p.w + 8, 8, 4); g.fill();
+      if (pl) g.drawImage(pl, p.x + (M.platform.dx || 0), p.y + (M.platform.dy || 0), p.w + (M.platform.dw || 0), M.platform.h || pl.height);
+      else paintPlatform(g, p);
     }
-    return { canvas: c, ox: -pad, oy: -pad * 0.5 };
+    return { canvas: c, ox: SCENE.ox, oy: SCENE.oy, png: usedPng || !!pl, mapReady: map.ready };
   }
 
   // ---------- lottatore ----------
@@ -364,5 +405,5 @@ window.SpintoniDraw = (() => {
     return '#e53935';
   }
 
-  return { sky, makeScene, fighter, portrait, dmgColor, SLOT_COLORS };
+  return { sky, makeScene, mapReady: () => map.ready, paint: { scenery: paintScenery, island: paintIsland, platform: paintPlatform }, SCENE, fighter, portrait, dmgColor, SLOT_COLORS };
 })();

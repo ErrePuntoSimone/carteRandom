@@ -63,3 +63,16 @@ test('le immagini sono servite con il tipo corretto', async () => {
     await new Promise((r) => server.close(r));
   }
 });
+
+test('mappa a PNG: map.json punta a immagini esistenti e PNG validi', () => {
+  const fs = require('fs');
+  const path = require('path');
+  const dir = path.join(__dirname, '..', 'public', 'spintoni', 'maps', 'default');
+  const meta = JSON.parse(fs.readFileSync(path.join(dir, 'map.json'), 'utf8'));
+  const files = [meta.sky, meta.scenery.img, meta.island.img, meta.platform.img];
+  for (const f of files) {
+    const buf = fs.readFileSync(path.join(dir, f));
+    assert.strictEqual(buf.subarray(1, 4).toString(), 'PNG', `${f} non è un PNG`);
+  }
+  for (const k of ['scenery', 'island']) for (const n of ['x', 'y', 'w', 'h']) assert.ok(Number.isFinite(meta[k][n]), `${k}.${n}`);
+});

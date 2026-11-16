@@ -507,6 +507,7 @@
       ctx.save();
       ctx.translate(offX + sx, offY + sy);
       ctx.scale(scale, scale);
+      if (!scene.mapReady && D.mapReady()) scene = D.makeScene(); // le immagini della mappa sono arrivate dopo
       ctx.drawImage(scene.canvas, scene.ox, scene.oy);
 
       const list = others();
