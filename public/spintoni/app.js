@@ -101,6 +101,15 @@
     return b ? b.name : '?';
   }
 
+  // colore dei dettagli scelto da un lottatore (hex) o null per i colori originali
+  function colorOf(id) {
+    if (!R) return null;
+    const g = R.game;
+    if (g.colors && g.colors[id]) return S.colorHex(g.colors[id]);
+    const b = g.bots.find((x) => x.id === id) || (g.order || []).find((x) => x.id === id);
+    return b && b.color ? S.colorHex(b.color) : null;
+  }
+
   function render(state) {
     R = state;
     const g = R.game;
@@ -125,7 +134,14 @@
   }
 
   let charsBuilt = false;
+  let portraitColor = undefined;
   function renderLobby(g) {
+    const myColor = g.colors ? g.colors[R.you] || null : null;
+    if (!$('colors').childElementCount) {
+      $('colors').innerHTML = `<button type="button" class="sw orig" data-color="" role="radio" aria-label="Colori originali" title="Colori originali"></button>`
+        + S.COLORS.map((c) => `<button type="button" class="sw" data-color="${c.id}" role="radio" style="--c:${c.hex}" aria-label="${esc(c.name)}" title="${esc(c.name)}"></button>`).join('');
+    }
+    for (const b of $('colors').querySelectorAll('[data-color]')) b.setAttribute('aria-checked', String((b.dataset.color || null) === myColor));
     if (!charsBuilt) {
       $('chars').innerHTML = CHAR_IDS.map((id) => {
         const d = S.CHARS[id];
@@ -133,8 +149,12 @@
           <canvas data-portrait="${id}"></canvas><span class="cn">${esc(d.name)}</span>
           <span class="cd">${esc(d.desc)}</span><span class="stats">${statBars(d)}</span></button>`;
       }).join('');
-      for (const c of $('chars').querySelectorAll('[data-portrait]')) D.portrait(c, c.dataset.portrait);
       charsBuilt = true;
+    }
+    // i ritratti dei personaggi mostrano il colore che ho scelto
+    if (portraitColor !== myColor) {
+      portraitColor = myColor;
+      for (const c of $('chars').querySelectorAll('[data-portrait]')) D.portrait(c, c.dataset.portrait, S.colorHex(myColor));
     }
     const mine = g.picks[R.you];
     for (const b of $('chars').querySelectorAll('[data-char]')) b.setAttribute('aria-pressed', String(b.dataset.char === mine));
@@ -145,12 +165,12 @@
     ];
     $('roster-count').textContent = `${list.length}/${g.max}`;
     $('roster').innerHTML = list.map((f) => `<li>
-        <canvas data-mini="${f.char}"></canvas>
+        <canvas data-mini="${f.char}" data-id="${esc(f.id)}"></canvas>
         <span class="nm">${esc(f.name)}${f.me ? ' <span class="muted small">(tu)</span>' : ''}${f.host ? ' 👑' : ''}</span>
         <span class="ch">${esc(S.CHARS[f.char].name)}</span>
         ${f.bot && isHost() ? `<button class="btn danger-text" data-rm-bot="${f.id}" aria-label="Togli ${esc(f.name)}">✕</button>` : ''}
       </li>`).join('');
-    for (const c of $('roster').querySelectorAll('[data-mini]')) D.portrait(c, c.dataset.mini);
+    for (const c of $('roster').querySelectorAll('[data-mini]')) D.portrait(c, c.dataset.mini, colorOf(c.dataset.id));
 
     $('host-tools').hidden = !isHost();
     $('btn-add-bot').hidden = list.length >= g.max;
@@ -167,14 +187,18 @@
       const win = g.results[0];
       $('results-title').textContent = win.id === R.you ? '🏆 Hai vinto!' : `🏆 Vince ${win.name}`;
       $('results-list').innerHTML = g.results.map((r, i) => `<li class="${i === 0 ? 'first' : ''} ${r.id === R.you ? 'me' : ''}">
-          <span class="pos">${i === 0 ? '👑' : i + 1}</span><canvas data-mini="${r.char}"></canvas>
+          <span class="pos">${i === 0 ? '👑' : i + 1}</span><canvas data-mini="${r.char}" data-id="${esc(r.id)}"></canvas>
           <span class="nm">${esc(r.name)}</span>
           <span class="st"><strong>${r.stocks}</strong> ${r.stocks === 1 ? 'vita' : 'vite'} · ${r.kos} KO · ${r.falls} cadute</span></li>`).join('');
-      for (const c of $('results-list').querySelectorAll('[data-mini]')) D.portrait(c, c.dataset.mini);
+      for (const c of $('results-list').querySelectorAll('[data-mini]')) D.portrait(c, c.dataset.mini, colorOf(c.dataset.id));
     }
   }
 
   $('chars').addEventListener('click', (e) => { const b = e.target.closest('[data-char]'); if (b) run('pick', { char: b.dataset.char }); });
+  $('colors').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-color]');
+    if (b) run('color', { color: b.dataset.color || null });
+  });
   $('roster').addEventListener('click', (e) => { const b = e.target.closest('[data-rm-bot]'); if (b) run('removeBot', { botId: b.dataset.rmBot }); });
   $('btn-add-bot').addEventListener('click', () => run('addBot'));
   $('sel-stocks').addEventListener('change', (e) => run('stocks', { stocks: Number(e.target.value) }));
@@ -312,9 +336,9 @@
       cardsKey = key;
       if (rebuild) {
         $('cards').innerHTML = list.map((f) => `<div class="fcard" data-f="${f.id}" style="--c:${D.SLOT_COLORS[f.sl % 4]}">
-          <canvas data-mini="${f.c}"></canvas><div><div class="fn">${esc(f.id === R.you ? 'Tu' : nameOf(f.id))}</div>
+          <canvas data-mini="${f.c}" data-id="${esc(f.id)}"></canvas><div><div class="fn">${esc(f.id === R.you ? 'Tu' : nameOf(f.id))}</div>
           <div class="pc"></div><div class="lv"></div></div></div>`).join('');
-        for (const c of $('cards').querySelectorAll('[data-mini]')) D.portrait(c, c.dataset.mini);
+        for (const c of $('cards').querySelectorAll('[data-mini]')) D.portrait(c, c.dataset.mini, colorOf(c.dataset.id));
       }
       for (const f of list) {
         const el = $('cards').querySelector(`[data-f="${CSS.escape(f.id)}"]`);
@@ -468,7 +492,7 @@
         if (st.hs > 0.1 && Math.hypot(st.vx, st.vy) > 700) {
           particles.push({ x: st.x, y: st.y - 44, vx: 0, vy: 0, life: 0.35, t: 0, color: 'rgba(255,255,255,.7)', size: 9 });
         }
-        D.fighter(ctx, st.x, st.y, st, f.sl, now, { name: f.id === R.you ? 'Tu' : nameOf(f.id) });
+        D.fighter(ctx, st.x, st.y, st, f.sl, now, { name: f.id === R.you ? 'Tu' : nameOf(f.id), color: colorOf(f.id) });
       }
 
       for (const r of rings) {

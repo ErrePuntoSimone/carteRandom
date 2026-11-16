@@ -25,6 +25,9 @@ for (const id of Object.keys(S.CHARS)) {
     assert.strictEqual(w, meta.cell.w * meta.cols, 'larghezza = celle × colonne');
     assert.strictEqual(h, meta.cell.h * Math.ceil(meta.frames / meta.cols), 'altezza = celle × righe');
     assert.ok(meta.anchor.x < meta.cell.w && meta.anchor.y < meta.cell.h);
+    // maschera dei dettagli colorabili: stessa griglia dello sprite
+    assert.strictEqual(meta.mask, `${id}-mask.png`);
+    assert.deepStrictEqual(pngSize(path.join(DIR, meta.mask)), { w, h }, 'la maschera ha le stesse dimensioni');
 
     let next = 0;
     for (const name of NEED) {

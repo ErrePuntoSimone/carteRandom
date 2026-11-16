@@ -15,8 +15,14 @@ window.SpintoniSprites = (() => {
     img.src = `/spintoni/sprites/${id}.png`;
     Promise.all([meta, loaded]).then(([m, ok]) => {
       if (!ok) return;
-      store[id] = { meta: m, img };
+      store[id] = { meta: m, img, mask: null };
       for (const f of waiters) f(id);
+      // maschera dei dettagli colorabili (facoltativa)
+      if (m.mask) {
+        const mk = new Image();
+        mk.onload = () => { store[id].mask = mk; for (const f of waiters) f(id); };
+        mk.src = `/spintoni/sprites/${m.mask}`;
+      }
     }).catch(() => { /* senza sprite si usa il disegno a codice */ });
   }
   for (const id of Object.keys(CHARS)) load(id);
@@ -69,5 +75,32 @@ window.SpintoniSprites = (() => {
     ctx.restore();
   }
 
-  return { get: (id) => store[id] || null, onLoad: (f) => waiters.push(f), pick, drawFrame };
+  // Colora i dettagli: maschera in scala di grigi × colore, applicata sopra il fotogramma.
+  const tmp = document.createElement('canvas');
+  const tctx = tmp.getContext('2d');
+  function drawTint(ctx, spr, name, frame, x, y, face, color) {
+    if (!spr.mask || !color) return;
+    const m = spr.meta;
+    const a = m.anims[name];
+    const idx = a.start + frame;
+    const sx = (idx % m.cols) * m.cell.w, sy = Math.floor(idx / m.cols) * m.cell.h;
+    if (tmp.width !== m.cell.w || tmp.height !== m.cell.h) { tmp.width = m.cell.w; tmp.height = m.cell.h; }
+    tctx.globalCompositeOperation = 'source-over';
+    tctx.clearRect(0, 0, tmp.width, tmp.height);
+    tctx.drawImage(spr.mask, sx, sy, m.cell.w, m.cell.h, 0, 0, m.cell.w, m.cell.h);
+    tctx.globalCompositeOperation = 'multiply';
+    tctx.fillStyle = color;
+    tctx.fillRect(0, 0, tmp.width, tmp.height);
+    tctx.globalCompositeOperation = 'destination-in';
+    tctx.drawImage(spr.mask, sx, sy, m.cell.w, m.cell.h, 0, 0, m.cell.w, m.cell.h);
+    tctx.globalCompositeOperation = 'source-over';
+    const k = 1 / m.scale;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(face, 1);
+    ctx.drawImage(tmp, -m.anchor.x * k, -m.anchor.y * k, m.cell.w * k, m.cell.h * k);
+    ctx.restore();
+  }
+
+  return { get: (id) => store[id] || null, onLoad: (f) => waiters.push(f), pick, drawFrame, drawTint };
 })();

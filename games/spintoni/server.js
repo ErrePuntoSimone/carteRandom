@@ -22,7 +22,7 @@ function stopMatch(g) {
 const manager = createRoomManager({
   maxPlayers: MAX_FIGHTERS,
   createGame(host) {
-    return { phase: 'lobby', picks: { [host.id]: 'gilda' }, bots: [], sim: null, loop: null, results: null, matchNo: 0, sockets: new Map(), stocks: 3 };
+    return { phase: 'lobby', picks: { [host.id]: 'gilda' }, colors: {}, bots: [], sim: null, loop: null, results: null, matchNo: 0, sockets: new Map(), stocks: 3 };
   },
   canJoin(room) {
     const g = room.game;
@@ -36,6 +36,7 @@ const manager = createRoomManager({
   onLeave(room, player) {
     const g = room.game;
     delete g.picks[player.id];
+    delete g.colors[player.id];
     const set = g.sockets.get(player.id);
     if (set) for (const ws of set) ws.close();
     g.sockets.delete(player.id);
@@ -46,8 +47,8 @@ const manager = createRoomManager({
     const g = room.game;
     return {
       game: {
-        phase: g.phase, matchNo: g.matchNo, picks: g.picks, stocks: g.stocks,
-        bots: g.bots.map((b) => ({ id: b.id, name: b.name, char: b.char })),
+        phase: g.phase, matchNo: g.matchNo, picks: g.picks, colors: g.colors, stocks: g.stocks,
+        bots: g.bots.map((b) => ({ id: b.id, name: b.name, char: b.char, color: b.color })),
         order: g.order || null, results: g.results, max: MAX_FIGHTERS,
       },
     };
@@ -58,6 +59,14 @@ const manager = createRoomManager({
       if (g.phase === 'playing') throw httpError(400, 'Cambia lottatore a fine partita.');
       if (!charOk(body.char)) throw httpError(400, 'Lottatore sconosciuto.');
       g.picks[player.id] = body.char;
+    },
+    // colore dei dettagli del personaggio; null o '' = colori originali
+    color(room, player, body) {
+      const g = room.game;
+      if (g.phase === 'playing') throw httpError(400, 'Cambia colore a fine partita.');
+      if (body.color === null || body.color === '' || body.color === undefined) { delete g.colors[player.id]; return; }
+      if (!S.colorHex(body.color)) throw httpError(400, 'Colore sconosciuto.');
+      g.colors[player.id] = body.color;
     },
     stocks(room, player, body, { requireHost }) {
       requireHost(room, player);
@@ -74,7 +83,11 @@ const manager = createRoomManager({
       const base = BOT_NAMES.find((n) => !used.has(n)) || `Bot ${g.bots.length + 1}`;
       const chars = Object.keys(S.CHARS);
       const char = charOk(body.char) ? body.char : chars[Math.floor(Math.random() * chars.length)];
-      g.bots.push({ id: 'bot-' + Math.random().toString(36).slice(2, 9), base, name: `${base} 🤖`, char });
+      // i bot prendono un colore a caso, diverso da quelli già usati se possibile
+      const taken = new Set([...Object.values(g.colors), ...g.bots.map((b) => b.color)]);
+      const free = S.COLORS.filter((c) => !taken.has(c.id));
+      const color = (free.length ? free : S.COLORS)[Math.floor(Math.random() * (free.length || S.COLORS.length))].id;
+      g.bots.push({ id: 'bot-' + Math.random().toString(36).slice(2, 9), base, name: `${base} 🤖`, char, color });
     },
     removeBot(room, player, body, { requireHost }) {
       requireHost(room, player);
@@ -92,7 +105,7 @@ const manager = createRoomManager({
         ...g.bots.map((b) => ({ id: b.id, name: b.name, char: b.char, bot: true })),
       ];
       for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
-      g.order = list.map((f) => ({ id: f.id, name: f.name, char: f.char }));
+      g.order = list.map((f) => ({ id: f.id, name: f.name, char: f.char, color: f.bot ? (g.bots.find((b) => b.id === f.id) || {}).color : g.colors[f.id] || null }));
       g.sim = new Sim({ players: list, stocks: g.stocks, duration: durationSec() });
       g.phase = 'playing';
       g.results = null;

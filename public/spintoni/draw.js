@@ -101,12 +101,12 @@ window.SpintoniDraw = (() => {
    */
   function fighter(ctx, x, y, st, slot, now, opts = {}) {
     const spr = window.SpintoniSprites && window.SpintoniSprites.get(st.c);
-    if (spr) { spriteFighter(ctx, x, y, st, now, spr); nameTag(ctx, x, y, slot, opts); return; }
+    if (spr) { spriteFighter(ctx, x, y, st, now, spr, opts.color); nameTag(ctx, x, y, slot, opts); return; }
     vectorFighter(ctx, x, y, st, slot, now, opts);
   }
 
   // Disegno con le immagini PNG (sprite sheet).
-  function spriteFighter(ctx, x, y, st, now, spr) {
+  function spriteFighter(ctx, x, y, st, now, spr, color) {
     const f = st.fc || 1;
     const { name, frame, tumble } = window.SpintoniSprites.pick(st, now, spr);
     ctx.save();
@@ -118,8 +118,10 @@ window.SpintoniDraw = (() => {
       ctx.translate(x, y - 44);
       ctx.rotate((now / 1000) * 14 * f);
       window.SpintoniSprites.drawFrame(ctx, spr, name, frame, 0, 44, f);
+      window.SpintoniSprites.drawTint(ctx, spr, name, frame, 0, 44, f, color);
     } else {
       window.SpintoniSprites.drawFrame(ctx, spr, name, frame, x, y, f);
+      window.SpintoniSprites.drawTint(ctx, spr, name, frame, x, y, f, color);
     }
     ctx.restore();
   }
@@ -277,7 +279,7 @@ window.SpintoniDraw = (() => {
   }
 
   const waiting = [];
-  function portrait(canvas, char) {
+  function portrait(canvas, char, color = null) {
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth || 70, h = canvas.clientHeight || 84;
     canvas.width = w * dpr; canvas.height = h * dpr;
@@ -288,14 +290,15 @@ window.SpintoniDraw = (() => {
     ctx.translate(w / 2 - 4 * s, h - 6 * s);
     ctx.scale(s, s);
     const spr = window.SpintoniSprites && window.SpintoniSprites.get(char);
-    if (!spr && window.SpintoniSprites && !waiting.some((q) => q.canvas === canvas)) waiting.push({ canvas, char });
-    fighter(ctx, 0, 0, { c: char, fc: 1, g: false, vx: 0, vy: 0, x: 0, a: null, hs: 0, dg: 0 }, 0, 0, { noTag: true });
+    // si ridisegna quando arrivano le immagini (e la maschera, se serve un colore)
+    if ((!spr || (color && !spr.mask)) && window.SpintoniSprites && !waiting.some((q) => q.canvas === canvas)) waiting.push({ canvas, char, color });
+    fighter(ctx, 0, 0, { c: char, fc: 1, g: false, vx: 0, vy: 0, x: 0, a: null, hs: 0, dg: 0 }, 0, 0, { noTag: true, color });
   }
   // appena le immagini sono caricate si ridisegnano i ritratti già mostrati
   if (window.SpintoniSprites) {
     window.SpintoniSprites.onLoad((id) => {
       for (let i = waiting.length - 1; i >= 0; i--) {
-        if (waiting[i].char === id) { portrait(waiting[i].canvas, id); waiting.splice(i, 1); }
+        if (waiting[i].char === id) { const q = waiting.splice(i, 1)[0]; portrait(q.canvas, id, q.color); }
       }
     });
   }
