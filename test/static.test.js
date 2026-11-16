@@ -19,10 +19,11 @@ test('il menu elenca i minigiochi', async () => {
   assert.match(r.text, /href="\/fiches\/"/);
   assert.match(r.text, /href="\/poker\/"/);
   assert.match(r.text, /href="\/briscola\/"/);
+  assert.match(r.text, /href="\/arena\/"/);
 });
 
 test('pagine dei minigiochi', async () => {
-  for (const g of ['carte', 'fiches', 'poker', 'briscola']) {
+  for (const g of ['carte', 'fiches', 'poker', 'briscola', 'arena']) {
     const r = await get(`/${g}/`);
     assert.strictEqual(r.status, 200, g);
     assert.match(r.type, /text\/html/);
@@ -32,6 +33,7 @@ test('pagine dei minigiochi', async () => {
   assert.strictEqual((await get('/common.css')).status, 200);
   assert.strictEqual((await get('/common.js')).status, 200);
   assert.strictEqual((await get('/briscola/cards.js')).status, 200);
+  for (const f of ['shared.js', 'draw.js']) assert.strictEqual((await get('/arena/' + f)).status, 200);
 });
 
 test('redirect alla cartella e link alle stanze', async () => {

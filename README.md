@@ -9,6 +9,7 @@ Il nome si cambia dalla home o dal link "Cambia nome" dentro ai giochi.
 | 🃏 **Carte Random** | `/carte/` | Multiplayer: crea una stanza e dai una carta a caso a ogni giocatore |
 | ♠️ **Poker** | `/poker/` | Multiplayer: gestisce una partita intera con le carte vere (turni, dealer, bui, puntate, fiches) |
 | 🏆 **Briscola** | `/briscola/` | Multiplayer: briscola con il mazzo napoletano, in 2 o in 4 a coppie |
+| 💥 **Rissa** | `/arena/` | Multiplayer d'azione in tempo reale: arena vista dall'alto, tutti contro tutti, anche con bot |
 | 🪙 **Conta fiches** | `/fiches/` | Conta le fiches di ogni giocatore a poker e calcola chi paga chi |
 
 ## Carte Random
@@ -62,6 +63,22 @@ e il tavolo non accetta altre persone.
   Il mazziere ruota a ogni partita e si tiene il conto delle partite vinte.
 - In 4, prima di iniziare, con "Gioca prima/dopo" si scelgono le coppie. Chi esce interrompe la partita.
 
+## Rissa
+
+Arena d'azione 2D vista dall'alto, in tempo reale, da 2 a 6 lottatori (persone o bot), tutti contro tutti.
+Partite da 2 minuti: vince chi fa più KO, o il primo che ne fa 10.
+
+- **Lottatori originali:** *Folgore* (veloce, raffica di 3 colpi, super: scatto che travolge),
+  *Macigno* (resistente, rosa di colpi da vicino, super: onda d'urto) e *Falco* (fragile, colpo lungo, super: dardo perforante).
+- **Regole:** 3 colpi che si ricaricano da soli; colpire carica la super; nei cespugli si è invisibili finché non si attacca
+  o qualcuno si avvicina; la vita si rigenera se non si subiscono colpi; dopo un KO si rientra in 3 secondi con uno scudo.
+- **Controlli:** sul telefono (meglio in orizzontale) joystick a sinistra per muoversi, a destra trascina e lascia per sparare
+  (un tocco breve usa la mira automatica) e pulsante SUPER; sul computer WASD, mouse e clic, spazio o tasto destro per la super.
+- **Bot:** l'host può aggiungerli per giocare anche in due o da solo.
+- **Rete:** il server simula la partita a 20 passi al secondo ed è l'unico a decidere colpi e danni; il telefono prevede subito
+  il proprio movimento con lo stesso codice (`public/arena/shared.js`) e mostra gli altri in modo fluido interpolando gli
+  aggiornamenti. La partita viaggia su WebSocket (`lib/ws.js`, scritto senza dipendenze), la sala d'attesa sulle stanze comuni.
+
 ## Conta fiches
 
 Funziona su un solo dispositivo, senza server: i dati restano salvati nel browser.
@@ -94,12 +111,15 @@ games/carte/           logica lato server di Carte Random (stanze, mazzi)
 games/poker/engine.js  regole del poker (puro, testato a parte)
 games/poker/server.js  API del poker sopra lib/rooms.js
 games/briscola/        regole (engine.js) e API (server.js) della Briscola
+games/arena/           simulazione (sim.js) e server in tempo reale (server.js) di Rissa
+lib/ws.js              WebSocket minimo per i giochi in tempo reale
 public/index.html      menu dei minigiochi
 public/common.css      stile condiviso
 public/common.js       nome del giocatore ("login") condiviso tra i giochi
 public/carte/          interfaccia di Carte Random
 public/poker/          interfaccia del Poker
 public/briscola/       interfaccia della Briscola
+public/arena/          Rissa: codice condiviso, disegno su canvas e interfaccia
 public/fiches/         Conta fiches (solo lato browser)
 test/                  test automatici
 ```
