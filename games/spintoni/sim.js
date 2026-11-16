@@ -326,9 +326,12 @@ class Sim {
         return inp;
       }
       const cs = S.CHARS[f.char].specials;
-      // proiettili a distanza media, le altre da vicino
-      const ready = S.SLOTS.filter((k) => S.meterFull(f, k)
-        && (cs[k].projectile ? dist >= 150 && dist <= 600 && Math.abs(dy) < 120 : dist < 150));
+      // proiettili fin dove arrivano (quelli ad arco non da vicino), le altre da vicino
+      const inRange = (k) => {
+        const p = [].concat(cs[k].projectile)[0];
+        return dist >= (p.grav ? 380 : 150) && dist <= Math.min(600, p.speed * p.life) && Math.abs(dy) < 120;
+      };
+      const ready = S.SLOTS.filter((k) => S.meterFull(f, k) && (cs[k].projectile ? inRange(k) : dist < 150));
       if (ready.length && !(f.att && f.att.ty.startsWith('sp:')) && this.rng() < 0.35) {
         const k = ready[Math.floor(this.rng() * ready.length)];
         f.face = dx >= 0 ? 1 : -1;

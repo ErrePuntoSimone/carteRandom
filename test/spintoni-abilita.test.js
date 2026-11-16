@@ -574,3 +574,34 @@ test('rientro: tenere Speciale durante il Turbine in aria non fa partire il Polv
   hold(g, { hb: 8 }, 12);
   assert.strictEqual(g.att.ty, 'sp:special');
 });
+
+// ---- revisione kit: niente KO da soli con un input normale ----
+const M = S.STAGE.main;
+const inAria = (char, x) => { const f = S.newFighter(x, M.y - 150, char); f.g = false; f.vy = 0; f.face = 1; return f; };
+
+test('scatti in aria: Carica di cavalleria e Pugno stellare non portano fuori dal bordo', () => {
+  for (const [char, slot] of [['micio', 'special'], ['gilda', 'heavy']]) {
+    for (const x of [M.x + M.w - 200, M.x + M.w - 100]) {
+      const f = inAria(char, x); castSp(f, slot);
+      for (let i = 0; i < 90; i++) S.stepFighter(f, idle);
+      assert.ok(f.g && f.x <= M.x + M.w, `${char} da x=${x}: x=${f.x} a terra=${f.g}`);
+    }
+  }
+  // da fuori dall'isola lo scatto verso l'isola funziona ancora (per rientrare)
+  const f = inAria('micio', M.x + M.w + 150); f.face = -1; castSp(f, 'special');
+  for (let i = 0; i < 10; i++) S.stepFighter(f, idle);
+  assert.ok(f.x < M.x + M.w + 150 - 200);
+});
+
+test('tuffo bomba: vicino al bordo, anche tenendo avanti, ricade sull\'isola', () => {
+  const f = ground('tonno'); f.x = M.x + M.w - 60; f.face = 1; castSp(f, 'heavy');
+  while (f.att) S.stepFighter(f, { ...idle, mx: 1 }); // avanti per tutta la mossa
+  assert.ok(f.g && Math.abs(f.y - M.y) < 1 && Math.abs(f.x - (M.x + M.w - 60)) < 10, `x=${f.x} y=${f.y}`);
+});
+
+test('tuffo bomba: tenuto in aria non parte', () => {
+  const f = inAria('tonno', M.x - 150); f.mt.heavy = S.CHARS.tonno.specials.heavy.charge;
+  hold(f, { hb: 2, down: true }, 15);
+  assert.ok(!isSp(f));
+  assert.strictEqual(f.mt.heavy, S.CHARS.tonno.specials.heavy.charge);
+});

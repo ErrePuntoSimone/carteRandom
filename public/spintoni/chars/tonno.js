@@ -22,7 +22,7 @@
       anim: 'heavy_up', startup: 0.5, active: 0.18, recovery: 0.35, dmg: 16, base: 600, growth: 13,
       boxes: { side: { x: -120, y: -90, w: 240, h: 90, ang: 70 } },
       motion: [{ from: 0.02, to: 0.25, vy: -1000 }, { from: 0.3, to: 0.5, vy: 1700 }],
-      keepOnLand: true,
+      keepOnLand: true, groundOnly: true, noDrift: true, // solo da terra, su e giù nello stesso punto
     },
     dodge: {
       name: 'Furia', desc: 'Per 4 secondi è più veloce e picchia più forte.', charge: 6,

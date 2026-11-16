@@ -39,6 +39,7 @@
   //   armor       corazza {from, to}: i colpi fanno danno ma non lanciano
   //   counter     parata {from, to, dmg, base, growth, ang}: se colpito in quel momento risponde
   //   cooldown    tempo di ricarica (speciale)         anim       animazione dello sprite da usare
+  //   groundOnly  (speciale nascosta) parte solo da terra      noDrift    in aria non si guida a destra/sinistra
   const MOVES = {
     light: {
       startup: 0.05, active: 0.08, recovery: 0.13, dmg: 5, base: 320, growth: 7,
@@ -276,7 +277,8 @@
     }
 
     // movimento orizzontale
-    const groundAttack = f.att && f.g;
+    // noDrift: la mossa non si guida in aria (il Tuffo bomba ricade dove è partito)
+    const groundAttack = f.att && (f.g || moveOf(f.char, f.att.ty).noDrift);
     if (f.dg > 0) {
       if (f.g) f.vx = f.dgDir * PHYS.dodgeSpeed;
       else { f.vx = f.dgDir * PHYS.dodgeSpeed * 0.8; f.vy = Math.min(f.vy, 60); }
@@ -301,14 +303,21 @@
       if (mo) {
         if (mo.vx !== undefined) {
           let vx = f.face * mo.vx;
-          if (f.g && mo.edgeStop) {
+          // le speciali nascoste si fermano al bordo dell'isola anche in aria (ma possono rientrare)
+          const hidden = f.att.ty.startsWith('sp:');
+          if (mo.edgeStop && (f.g || hidden)) {
             const [lo, hi] = supportRange(f);
             const nx = f.x + vx * dt;
-            if (nx < lo + 10 || nx > hi - 10) vx = 0;
+            const out = nx < lo + 10 || nx > hi - 10;
+            if (f.g ? out : out && (nx < lo + 10 ? vx < 0 : vx > 0)) vx = 0;
           }
           f.vx = vx;
         }
         if (mo.vy !== undefined) { f.vy = mo.vy - PHYS.g * dt; if (mo.vy < 0) f.g = false; }
+      } else if (f.att && f.att.ty.startsWith('sp:') && moveOf(f.char, f.att.ty).motion) {
+        // finito lo scatto non si resta lanciati (niente uscita dal bordo per slancio): a terra fermo, in aria velocità normale
+        const sp = f.g ? 0 : statOf(f, 'speed');
+        f.vx = Math.max(-sp, Math.min(sp, f.vx));
       }
     }
 
@@ -353,7 +362,8 @@
       // Potenziato tenuto da solo resta il pugno caricato: la sua speciale vuole anche giù;
       // Speciale tenuta mentre si rientra in aria (mossa con recover) non interrompe il rientro
       const rientro = slot === 'special' && f.att && f.att.air && moveOf(f.char, f.att.ty).recover;
-      if (f.spArm[slot] && meterFull(f, slot) && (slot !== 'heavy' || inp.down) && !rientro) {
+      const soloTerra = !f.g && moveOf(f.char, 'sp:' + slot).groundOnly; // es. Tuffo bomba: in aria non parte
+      if (f.spArm[slot] && meterFull(f, slot) && (slot !== 'heavy' || inp.down) && !rientro && !soloTerra) {
         f.mt[slot] = 0;
         startSpecial(f, 'sp:' + slot);
       }

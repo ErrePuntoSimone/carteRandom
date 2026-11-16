@@ -134,7 +134,7 @@ dopo il suo **tempo di ricarica** (`cooldown`). Campi che il motore sa gestire i
 | `dmg`, `base`, `growth`, `boxes` | danno, lancio e zone di colpo (`side`, `up`, `down`; una sola = vale per tutte le direzioni) |
 | `chargeable` | si carica tenendo premuto (come il forte) |
 | `lunge` | passetto in avanti `{ speed, time }` |
-| `motion` | spinte durante la mossa `[{ from, to, vx, vy, edgeStop }]` (scatti, salite) |
+| `motion` | spinte durante la mossa `[{ from, to, vx, vy, edgeStop }]` (scatti, salite); nelle speciali nascoste `edgeStop` ferma al bordo dell'isola anche in aria e a fine scatto in aria si torna alla velocità normale |
 | `keepOnLand` | in aria non si interrompe atterrando |
 | `armor` | corazza `{ from, to }`: i colpi fanno danno ma non lanciano né interrompono |
 | `counter` | parata `{ from, to, dmg, base, growth, ang }`: chi colpisce in quel momento viene respinto |
@@ -155,6 +155,8 @@ quattro piene). Campi in più:
 | `buff` | su di sé `{ at, dur, speed, jump, power, weight }`: moltiplicatori per `dur` secondi (un buff nuovo rinnova quello in corso, non si somma) |
 | `debuff` | su chi viene colpito `{ dur, speed, jump, power, weight }` (come il buff: rinnova, non si somma) |
 | `noLaunch` | colpisce (danno, stati) senza lanciare né interrompere |
+| `groundOnly` | la speciale parte solo da terra (tenuta in aria non succede nulla) |
+| `noDrift` | durante la mossa non ci si guida a destra e sinistra, neanche in aria |
 
 Kit di **Pepe**: *Pugno di vento* (Basico, proiettile piccolo e veloce), *Palla di fuoco* (Potenziato, proiettile lento
 e forte), *Turbo* (Schiva, per 4 s corre il 40% più veloce), *Polverone* (Speciale, nuvola che rallenta chi ci finisce

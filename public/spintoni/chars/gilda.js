@@ -23,6 +23,7 @@
       boxes: { side: { x: 20, y: -80, w: 100, h: 56, ang: 38 } },
       motion: [{ from: 0.15, to: 0.35, vx: 900, edgeStop: true }],
       armor: { from: 0, to: 0.35 },
+      keepOnLand: true, // atterrando continua lo scatto (e si ferma al bordo)
     },
     dodge: {
       name: 'Scudo di stelle', desc: 'Per 5 secondi pesa di più: buttarla fuori è molto più difficile.', charge: 6,

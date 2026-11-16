@@ -33,6 +33,7 @@
       boxes: { side: { x: 20, y: -76, w: 120, h: 44, ang: 20 } },
       motion: [{ from: 0.1, to: 0.42, vx: 1400, edgeStop: true }],
       armor: { from: 0, to: 0.42 },
+      keepOnLand: true, // atterrando continua lo scatto (e si ferma al bordo)
     },
     ultimate: {
       name: 'Mille fendenti', desc: 'Cinque lame a ventaglio che attraversano tutti, con la corazza addosso.',
