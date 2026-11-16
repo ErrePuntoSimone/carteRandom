@@ -122,6 +122,7 @@ Se le immagini mancano, il gioco usa il disegno a codice (`public/spintoni/draw.
   di grigi (già tagliati dove li coprono braccia o corpo). Il gioco la moltiplica per il colore scelto e la disegna sopra
   il fotogramma, così le ombre restano. Nel disegnatore le zone colorabili sono segnate con `ctx.__acc`.
 - **Importare un personaggio disegnato a parte:** `python3 tools/import-sheet.py tools/sprites/micio/map.json`
+  - Pepe è stato importato così dallo sheet in `tools/sprites/pepe/` (`prep.py` toglie lo sfondo grigio e crea la sagoma; i dettagli colorabili sono fascia e pantaloncini).
   (è così che è stato aggiunto Micio). Servono uno sprite sheet nella stessa griglia 10×8, anche su sfondo nero, e una
   "sagoma" (personaggio bianco su nero, con i dettagli colorabili in un colore acceso). Nel file di mappa si indica, per
   ogni animazione, quali fotogrammi usare: così l'ordine della griglia di origine può essere qualsiasi. Lo strumento
