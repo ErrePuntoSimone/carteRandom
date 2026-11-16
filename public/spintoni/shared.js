@@ -347,8 +347,12 @@
   ];
   const colorHex = (id) => (COLORS.find((c) => c.id === id) || {}).hex || null;
 
+  // Snapshot: ogni quanti passi il server manda lo stato (2 = 15 al secondo) e valori omessi quando sono "a riposo".
+  const SEND_EVERY = 2;
+  const SNAP_DEFAULTS = { vx: 0, vy: 0, a: null, hs: 0, dg: 0, inv: false };
+
   const api = {
-    TICK, STAGE, PHYS, CHARS, MOVES, ATTACKS, COLORS, colorHex, registerChar, moveOf, inWindow, newFighter, physState, stepFighter,
+    TICK, SEND_EVERY, SNAP_DEFAULTS, STAGE, PHYS, CHARS, MOVES, ATTACKS, COLORS, colorHex, registerChar, moveOf, inWindow, newFighter, physState, stepFighter,
     hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds, lungeVelocity, chargeFrac, attackTotal,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

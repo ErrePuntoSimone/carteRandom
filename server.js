@@ -33,14 +33,22 @@ const MIME = {
   '.webmanifest': 'application/manifest+json',
 };
 
-function sendFile(res, file) {
-  fs.readFile(file, (err, data) => {
+function sendFile(req, res, file) {
+  fs.stat(file, (err, st) => {
     if (err) return sendJson(res, 404, { error: 'Non trovato' });
-    const headers = { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' };
-    // immagini: cache breve; il resto va sempre riscaricato (niente versioni vecchie sul telefono dopo un aggiornamento)
-    headers['Cache-Control'] = path.extname(file) === '.png' ? 'public, max-age=300' : 'no-cache';
-    res.writeHead(200, headers);
-    res.end(data);
+    // immagini: cache breve; il resto va sempre ricontrollato (niente versioni vecchie sul telefono dopo un aggiornamento).
+    // Con l'ETag il browser ricontrolla con una risposta 304 vuota invece di riscaricare tutto: meno banda su Render.
+    const headers = {
+      'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
+      'Cache-Control': path.extname(file) === '.png' ? 'public, max-age=300' : 'no-cache',
+      ETag: `"${st.size.toString(36)}-${Math.floor(st.mtimeMs).toString(36)}"`,
+    };
+    if (req.headers['if-none-match'] === headers.ETag) { res.writeHead(304, headers); return res.end(); }
+    fs.readFile(file, (err2, data) => {
+      if (err2) return sendJson(res, 404, { error: 'Non trovato' });
+      res.writeHead(200, headers);
+      res.end(data);
+    });
   });
 }
 
@@ -60,7 +68,7 @@ function sendCharsBundle(res) {
   }
 }
 
-function serveStatic(res, pathname) {
+function serveStatic(req, res, pathname) {
   let decoded;
   try { decoded = decodeURIComponent(pathname); } catch { return sendJson(res, 400, { error: 'Percorso non valido' }); }
   const file = path.normalize(path.join(PUBLIC_DIR, decoded));
@@ -72,14 +80,14 @@ function serveStatic(res, pathname) {
         res.writeHead(301, { Location: pathname + '/' });
         return res.end();
       }
-      return sendFile(res, path.join(file, 'index.html'));
+      return sendFile(req, res, path.join(file, 'index.html'));
     }
-    if (!err) return sendFile(res, file);
+    if (!err) return sendFile(req, res, file);
     // Percorsi "virtuali" senza estensione (es. /carte/r/ABCDE):
     // si serve l'index.html del minigioco corrispondente.
     const game = pathname.split('/').filter(Boolean)[0];
     if (!path.extname(pathname) && game && fs.existsSync(path.join(PUBLIC_DIR, game, 'index.html'))) {
-      return sendFile(res, path.join(PUBLIC_DIR, game, 'index.html'));
+      return sendFile(req, res, path.join(PUBLIC_DIR, game, 'index.html'));
     }
     sendJson(res, 404, { error: 'Non trovato' });
   });
@@ -104,7 +112,7 @@ const server = http.createServer(async (req, res) => {
     }
     // tutti i personaggi di Spintoni in un solo script (elenco e ordine in public/spintoni/chars/index.json)
     if (url.pathname === '/spintoni/chars.js') return sendCharsBundle(res);
-    serveStatic(res, url.pathname);
+    serveStatic(req, res, url.pathname);
   } catch (err) {
     const status = err.status || 500;
     if (status === 500) console.error(err);
