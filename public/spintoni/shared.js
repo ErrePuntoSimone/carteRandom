@@ -26,6 +26,7 @@
     chargeMax: 2, // secondi massimi di carica del pugno forte
     chargeRecovery: 0.7, // fermo in più dopo un forte caricato: proporzionale alla carica (massimo, a carica piena)
     airJumps: 2, // salti in aria disponibili dopo aver lasciato il suolo
+    holdSpecial: 0.35, meterDist: 400, meterDmg: 10, // tenuta per la speciale (s) / distanza (unità) e danno (%) che valgono 1 punto barra
     coyote: 0.1, jumpBuffer: 0.12, // salto ancora possibile appena lasciato il bordo / salto premuto poco prima di atterrare
   };
 
@@ -70,24 +71,47 @@
       moves[ty] = { ...(base || {}), ...(own || {}) };
       moves[ty].boxes = { ...((base && base.boxes) || {}), ...((own && own.boxes) || {}) };
     }
-    CHARS[def.id] = { ...def.stats, name: def.name, color: def.color, desc: def.desc, moves, hooks: def.hooks || {}, fx: { color: def.color, glow: '#ffffff', shape: 'dot', ...(def.fx || {}) } };
+    let specials = null; // mosse nascoste (tenuta, schivata, speciale, suprema) con le loro barre: opzionali
+    if (def.specials) {
+      specials = {};
+      for (const k of Object.keys(def.specials)) {
+        const own = def.specials[k];
+        specials[k] = { ...MOVES.light, ...own, boxes: { ...MOVES.light.boxes, ...(own.boxes || {}) } };
+      }
+    }
+    CHARS[def.id] = { ...def.stats, name: def.name, color: def.color, desc: def.desc, specials, meter: { move: 0.5, hit: 0.5, ...(def.meter || {}) }, moves, hooks: def.hooks || {}, fx: { color: def.color, glow: '#ffffff', shape: 'dot', ...(def.fx || {}) } };
   }
   const charDefs = typeof module !== 'undefined' && module.exports
     ? require('./chars/index.json').map((id) => require(`./chars/${id}.js`))
     : root.SpintoniCharDefs || [];
   for (const d of charDefs) registerChar(d);
   const DEFAULT_CHAR = CHARS.gilda ? 'gilda' : Object.keys(CHARS)[0];
-  const moveOf = (char, ty) => ((CHARS[char] || CHARS[DEFAULT_CHAR]).moves[ty]) || MOVES.light;
+  const SLOTS = ['light', 'heavy', 'dodge', 'special'];
+  const moveOf = (char, ty) => {
+    const c = CHARS[char] || CHARS[DEFAULT_CHAR];
+    if (ty.startsWith('sp:')) return (c.specials && c.specials[ty.slice(3)]) || MOVES.light;
+    return c.moves[ty] || MOVES.light;
+  };
+  // barre delle abilità: ognuna sale fino al charge della sua speciale
+  function addMeter(f, points) {
+    if (!f.mt) return;
+    const sp = CHARS[f.char].specials;
+    for (const k of SLOTS) f.mt[k] = Math.min(sp[k].charge, f.mt[k] + points);
+  }
+  const meterFull = (f, slot) => !!f.mt && f.mt[slot] >= CHARS[f.char].specials[slot].charge;
 
   const sign = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
   const approach = (v, target, step) => (v < target ? Math.min(target, v + step) : Math.max(target, v - step));
 
   function newFighter(x, y, char) {
-    return {
+    const f = {
       x, y, vx: 0, vy: 0, face: 1, g: false, onPlat: false, jumps: PHYS.airJumps,
       att: null, attN: 0, buf: null, hs: 0, dg: 0, dgDir: 0, dodgeCd: 0, spCd: 0, inv: 0, drop: 0, coyote: 0, jbuf: 0,
       char: CHARS[char] ? char : DEFAULT_CHAR,
+      mt: null,
     };
+    if (CHARS[f.char].specials) f.mt = { light: 0, heavy: 0, dodge: 0, special: 0 };
+    return f;
   }
 
   // Copia solo i campi di fisica (per la previsione sul telefono).
@@ -96,6 +120,7 @@
     const o = {};
     for (const k of FIELDS) o[k] = f[k];
     o.att = f.att ? { ty: f.att.ty, dir: f.att.dir, t: f.att.t, air: f.att.air, id: f.att.id, c: f.att.c, rel: f.att.rel } : null;
+    o.mt = f.mt ? { ...f.mt } : null;
     o.buf = f.buf ? { ty: f.buf.ty, t: f.buf.t } : null;
     return o;
   }
@@ -284,7 +309,9 @@
     const maxFall = inp.down && !f.g && f.vy > 0 ? PHYS.fastFall : PHYS.maxFall;
     f.vy = Math.min(f.vy + PHYS.g * dt, maxFall);
     if (inp.down && !f.g && f.vy > 0) f.vy = Math.max(f.vy, PHYS.fastFall * 0.75);
+    const x0 = f.x, y0 = f.y;
     integrate(f, dt, true);
+    addMeter(f, Math.hypot(f.x - x0, f.y - y0) / PHYS.meterDist * ch.meter.move);
     return f;
   }
 
@@ -352,7 +379,7 @@
   const SNAP_DEFAULTS = { vx: 0, vy: 0, a: null, hs: 0, dg: 0, inv: false };
 
   const api = {
-    TICK, SEND_EVERY, SNAP_DEFAULTS, STAGE, PHYS, CHARS, MOVES, ATTACKS, COLORS, colorHex, registerChar, moveOf, inWindow, newFighter, physState, stepFighter,
+    TICK, SEND_EVERY, SNAP_DEFAULTS, STAGE, PHYS, CHARS, MOVES, ATTACKS, COLORS, colorHex, registerChar, moveOf, SLOTS, addMeter, meterFull, inWindow, newFighter, physState, stepFighter,
     hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds, lungeVelocity, chargeFrac, attackTotal,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
