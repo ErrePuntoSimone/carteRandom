@@ -33,7 +33,7 @@ class Sim {
       id, name, bot: !!bot, slot: i, dmg: 0, stocks: this.stocks, alive: true, respawnAt: 0, out: 0,
       kos: 0, falls: 0, dealt: 0, lastHitBy: null, lastHitAt: -99, hitBy: new Set(),
       queue: [], seq: 0, held: { ...NEUTRAL },
-      brain: bot ? { think: 0, inp: { ...NEUTRAL }, jumpT: 0 } : null,
+      brain: bot ? { think: 0, inp: { ...NEUTRAL }, jumpT: 0, holdT: 0 } : null,
     });
     this.fighters.set(id, f);
   }
@@ -52,7 +52,7 @@ class Sim {
     if (!(s > f.seq) || (f.queue.length && s <= f.queue[f.queue.length - 1].s)) return;
     f.queue.push({
       s, mx: Math.max(-1, Math.min(1, Number(m.mx) || 0)), up: !!m.up, down: !!m.dn,
-      j: !!m.j, l: !!m.l, h: !!m.h, d: !!m.d, dd: !!m.dd,
+      j: !!m.j, l: !!m.l, h: !!m.h, hd: !!m.hd, d: !!m.d, dd: !!m.dd,
     });
     if (f.queue.length > 10) f.queue.splice(0, f.queue.length - 10);
   }
@@ -78,7 +78,7 @@ class Sim {
         for (let k = 0; k < n; k++) {
           const inp = f.queue.shift();
           f.seq = inp.s;
-          f.held = { mx: inp.mx, up: inp.up, down: inp.down };
+          f.held = { mx: inp.mx, up: inp.up, down: inp.down, hd: inp.hd };
           S.stepFighter(f, inp, dt);
         }
       }
@@ -108,7 +108,7 @@ class Sim {
         if (v === a || !v.alive || v.inv > 0 || a.hitBy.has(v.id)) continue;
         if (S.overlap(box, S.hurtbox(v))) {
           a.hitBy.add(v.id);
-          hits.push([a, v, { ty: a.att.ty, dir: a.att.dir, air: a.att.air }]);
+          hits.push([a, v, { ty: a.att.ty, dir: a.att.dir, air: a.att.air, p: S.chargeFrac(a.att) }]);
         }
       }
     }
@@ -120,10 +120,11 @@ class Sim {
     const move = S.MOVES[att.ty];
     const box = move.boxes[att.dir];
     const ca = S.CHARS[a.char], cv = S.CHARS[v.char];
-    const dmg = move.dmg * ca.power;
+    const p = att.p || 0; // carica del pugno forte (0..1): fino al doppio del danno e quasi al doppio del lancio
+    const dmg = move.dmg * ca.power * (1 + p);
     v.dmg = Math.min(999, v.dmg + dmg);
     a.dealt += dmg;
-    const kb = ((move.base + move.growth * v.dmg) * ca.power) / cv.weight;
+    const kb = (((move.base + move.growth * v.dmg) * ca.power) / cv.weight) * (1 + 0.7 * p);
     const angDeg = att.dir === 'down' && att.air ? box.airAng : box.ang;
     const ang = (angDeg * Math.PI) / 180;
     v.vx = Math.cos(ang) * kb * a.face;
@@ -133,7 +134,7 @@ class Sim {
     v.hs = Math.min(1.2, kb * 0.00032 + 0.08);
     v.att = null; v.buf = null; v.dg = 0;
     v.lastHitBy = a.id; v.lastHitAt = this.time;
-    this.events.push({ t: 'hit', id: v.id, by: a.id, x: r1(v.x), y: r1(v.y - 50), ty: att.ty, kb: Math.round(kb), vx: r1(v.vx), vy: r1(v.vy) });
+    this.events.push({ t: 'hit', id: v.id, by: a.id, x: r1(v.x), y: r1(v.y - 50), ty: att.ty, kb: Math.round(kb), ch: r1(p), vx: r1(v.vx), vy: r1(v.vy) });
   }
 
   ko(f) {
@@ -181,7 +182,7 @@ class Sim {
     }
 
     br.think -= dt;
-    if (br.think > 0) return { ...br.inp, j: false, l: false, h: false, d: false, dd: false };
+    if (br.think > 0) { br.holdT = Math.max(0, br.holdT - dt); return { ...br.inp, j: false, l: false, h: false, d: false, dd: false, hd: br.holdT > 0 }; }
     br.think = 0.07 + this.rng() * 0.08; // tempo di reazione
 
     let target = null, bestD = Infinity;
@@ -208,7 +209,12 @@ class Sim {
       if (target.att && r < 0.12 && f.dodgeCd <= 0) inp.d = true;
       else if (r < 0.75) {
         const heavy = target.dmg > 60 ? this.rng() < 0.5 : this.rng() < 0.2;
-        if (heavy) inp.h = true; else inp.l = true;
+        if (heavy) {
+          inp.h = true;
+          // a volte lo carica un po' (con meno di 1,2 s, per non restare fermo troppo)
+          br.holdT = this.rng() < 0.3 ? 0.3 + this.rng() * 0.9 : 0;
+          inp.hd = br.holdT > 0;
+        } else inp.l = true;
         if (dy < -55) inp.up = true;
         else if (dy > 40 && !f.g) inp.down = true;
       }
@@ -225,7 +231,7 @@ class Sim {
       const base = {
         id: f.id, c: f.char, sl: f.slot, al: f.alive, st: f.stocks, dm: Math.round(f.dmg),
         x: r1(f.x), y: r1(f.y), vx: r1(f.vx), vy: r1(f.vy), fc: f.face, g: f.g,
-        a: f.att ? { ty: f.att.ty, dir: f.att.dir, t: r3(f.att.t), air: f.att.air } : null,
+        a: f.att ? { ty: f.att.ty, dir: f.att.dir, t: r3(f.att.t), air: f.att.air, c: r3(f.att.c || 0), rel: f.att.rel ? 1 : 0 } : null,
         hs: r3(f.hs), dg: r3(f.dg), inv: f.inv > 0,
       };
       if (f.id === viewerId) base.ph = S.physState(f);

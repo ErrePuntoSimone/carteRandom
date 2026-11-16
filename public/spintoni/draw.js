@@ -1,7 +1,7 @@
 'use strict';
 // Disegno di "Spintoni" su canvas: sfondo, isola, piattaforme e lottatori con i guantoni.
 window.SpintoniDraw = (() => {
-  const { STAGE, CHARS, MOVES } = window.SpintoniShared;
+  const { STAGE, CHARS, MOVES, PHYS } = window.SpintoniShared;
   const TAU = Math.PI * 2;
   const SLOT_COLORS = ['#ff5252', '#448aff', '#69f0ae', '#ffd740'];
 
@@ -100,9 +100,62 @@ window.SpintoniDraw = (() => {
    * st: { c, fc, g, vx, vy, a: {ty, dir, t, air}, hs, dg, inv }, slot: colore del giocatore
    */
   function fighter(ctx, x, y, st, slot, now, opts = {}) {
+    chargeAura(ctx, x, y, st, now);
     const spr = window.SpintoniSprites && window.SpintoniSprites.get(st.c);
-    if (spr) { spriteFighter(ctx, x, y, st, now, spr, opts.color); nameTag(ctx, x, y, slot, opts); return; }
-    vectorFighter(ctx, x, y, st, slot, now, opts);
+    if (spr) { spriteFighter(ctx, x, y, st, now, spr, opts.color); nameTag(ctx, x, y, slot, opts); }
+    else vectorFighter(ctx, x, y, st, slot, now, opts);
+    chargeBar(ctx, x, y, st, now);
+  }
+
+  // Carica del pugno forte: 0..1, oppure 0 se non sta caricando.
+  function chargeOf(st) {
+    const a = st.a;
+    if (!a || a.ty !== 'heavy' || a.rel || !(a.c > 0.02)) return 0;
+    return Math.min(1, a.c / PHYS.chargeMax);
+  }
+
+  // Alone che cresce e pulsa attorno a chi sta caricando, con scintille che convergono sul busto.
+  function chargeAura(ctx, x, y, st, now) {
+    const p = chargeOf(st);
+    if (!p) return;
+    const cy = y - 44, full = p >= 0.999;
+    const r = 34 + 34 * p + Math.sin(now / 70) * 3 * p;
+    const g = ctx.createRadialGradient(x, cy, 6, x, cy, r);
+    g.addColorStop(0, `rgba(255, 245, 157, ${0.2 + 0.4 * p})`);
+    g.addColorStop(0.6, `rgba(255, 179, 0, ${0.12 + 0.28 * p})`);
+    g.addColorStop(1, 'rgba(255, 112, 67, 0)');
+    ctx.save();
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, cy, r, 0, TAU); ctx.fill();
+    ctx.strokeStyle = `rgba(255, 255, 255, ${full ? 0.5 + 0.4 * Math.sin(now / 45) : 0.25 + 0.3 * p})`;
+    ctx.lineWidth = 2 + 3 * p;
+    ctx.beginPath(); ctx.arc(x, cy, r * 0.82, 0, TAU); ctx.stroke();
+    // scintille verso il centro
+    for (let i = 0; i < 6; i++) {
+      const t = ((now / (full ? 260 : 420)) + i / 6) % 1;
+      const a = i * 1.047 + now / 900;
+      const rr = (r + 10) * (1 - t);
+      ctx.fillStyle = `rgba(255, 241, 118, ${0.9 * (1 - t)})`;
+      ctx.beginPath(); ctx.arc(x + Math.cos(a) * rr, cy + Math.sin(a) * rr, 2.5 + 2 * p, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Barra della carica sopra il nome.
+  function chargeBar(ctx, x, y, st, now) {
+    const p = chargeOf(st);
+    if (!p) return;
+    const w = 64, h = 8, bx = x - w / 2, by = y - 146;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.65)'; rr(ctx, bx - 2, by - 2, w + 4, h + 4, 5); ctx.fill();
+    const g = ctx.createLinearGradient(bx, 0, bx + w, 0);
+    g.addColorStop(0, '#ffee58'); g.addColorStop(0.6, '#ffa726'); g.addColorStop(1, '#ef5350');
+    ctx.fillStyle = g; rr(ctx, bx, by, Math.max(4, w * p), h, 4); ctx.fill();
+    if (p >= 0.999) {
+      ctx.strokeStyle = `rgba(255,255,255,${0.6 + 0.4 * Math.sin(now / 45)})`; ctx.lineWidth = 2;
+      rr(ctx, bx - 2, by - 2, w + 4, h + 4, 5); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // Disegno con le immagini PNG (sprite sheet).

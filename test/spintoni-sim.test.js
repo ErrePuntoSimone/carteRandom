@@ -222,3 +222,82 @@ test('saltando durante il recupero di un colpo lo si annulla', () => {
   S.stepFighter(f, { ...idleInp, j: true });
   assert.ok(!f.att && !f.g && f.vy < 0, 'recupero annullato dal salto');
 });
+
+// ---------- pugno forte caricabile ----------
+const hold = (f, inp, n) => { for (let i = 0; i < n; i++) S.stepFighter(f, i === 0 ? inp : { ...idleInp, hd: inp.hd, mx: inp.mx || 0 }); };
+
+test('il forte si carica tenendo premuto: resta in posa, la carica sale e si ferma a 2 secondi', () => {
+  const f = onIsland(800);
+  S.stepFighter(f, { ...idleInp, h: true, hd: true });
+  for (let i = 0; i < 10; i++) S.stepFighter(f, { ...idleInp, hd: true });
+  assert.ok(f.att && !f.att.rel, 'in preparazione');
+  assert.ok(f.att.t < S.MOVES.heavy.startup, 'il colpo non è ancora partito');
+  const c1 = f.att.c;
+  assert.ok(c1 > 0, `sta caricando: ${c1.toFixed(2)}`);
+  const x = f.x;
+  for (let i = 0; i < 20; i++) S.stepFighter(f, { ...idleInp, hd: true, mx: 1 });
+  assert.ok(f.att.c > c1 && f.att.c < S.PHYS.chargeMax);
+  assert.ok(Math.abs(f.x - x) < 1, 'mentre carica a terra è fermo');
+  // continua a tenere premuto: a 2 secondi parte da solo
+  let released = false;
+  for (let i = 0; i < 90 && !released; i++) {
+    S.stepFighter(f, { ...idleInp, hd: true });
+    if (f.att && f.att.rel) released = true;
+    assert.ok(!f.att || f.att.c <= S.PHYS.chargeMax + 1e-9, 'la carica non supera il massimo');
+  }
+  assert.ok(released, 'a 2 secondi il colpo parte da solo');
+  assert.ok(Math.abs(f.att.c - S.PHYS.chargeMax) < 1e-6, `carica massima: ${f.att.c}`);
+});
+
+test('un tocco veloce sul forte non ha ritardo: parte come prima', () => {
+  const frames = (heldInput) => {
+    const f = onIsland(800);
+    let n = 0;
+    S.stepFighter(f, { ...idleInp, h: true, hd: heldInput });
+    while (f.att && !S.isActive(f.att) && n < 60) { S.stepFighter(f, idleInp); n++; }
+    return n;
+  };
+  const tap = frames(false);
+  assert.ok(tap <= Math.ceil(S.MOVES.heavy.startup / S.TICK) + 1, `passi prima del colpo: ${tap}`);
+});
+
+test('rilasciando, danno e lancio crescono con la carica; a carica piena sono quasi doppi', () => {
+  const mk = (chargeSteps) => {
+    const sim = new Sim({ players: [{ id: 'a', name: 'A', char: 'gilda' }, { id: 'b', name: 'B', char: 'gilda' }] });
+    const a = sim.fighters.get('a'), b = sim.fighters.get('b');
+    a.x = 760; b.x = 830; a.face = 1; a.inv = b.inv = 0;
+    for (const f of [a, b]) { f.y = S.STAGE.main.y; f.g = true; }
+    let s = 1, hit = null;
+    sim.pushInput('a', { s: s++, h: true, hd: true });
+    for (let i = 0; i < chargeSteps; i++) { sim.pushInput('a', { s: s++, hd: true }); sim.step(); hit = hit || sim.events.find((e) => e.t === 'hit'); }
+    for (let i = 0; i < 40 && !hit; i++) { sim.pushInput('a', { s: s++ }); sim.step(); hit = hit || sim.events.find((e) => e.t === 'hit'); }
+    return { dmg: b.dmg, kb: hit.kb, ch: hit.ch };
+  };
+  const tap = mk(0), half = mk(30), full = mk(90);
+  assert.ok(Math.abs(tap.dmg - 12) < 0.5, `forte senza carica: ${tap.dmg}`);
+  assert.ok(half.dmg > tap.dmg * 1.3 && half.dmg < full.dmg, `a metà: ${half.dmg}`);
+  assert.ok(full.dmg > tap.dmg * 1.9 && full.dmg < tap.dmg * 2.1, `carica piena: ${full.dmg}`);
+  assert.ok(full.kb > tap.kb * 1.5, `lancio ${tap.kb} -> ${full.kb}`);
+  assert.ok(full.ch > 0.95 && tap.ch === 0);
+});
+
+test('un colpo ricevuto o la schivata interrompono la carica', () => {
+  const sim = new Sim({ players: [{ id: 'a', name: 'A', char: 'gilda' }, { id: 'b', name: 'B', char: 'gilda' }] });
+  const a = sim.fighters.get('a'), b = sim.fighters.get('b');
+  a.x = 760; b.x = 830; a.inv = b.inv = 0;
+  for (const f of [a, b]) { f.y = S.STAGE.main.y; f.g = true; }
+  let sa = 1, sb = 1;
+  sim.pushInput('a', { s: sa++, h: true, hd: true });
+  for (let i = 0; i < 12; i++) { sim.pushInput('a', { s: sa++, hd: true }); sim.step(); }
+  assert.ok(a.att && a.att.c > 0, 'a sta caricando');
+  sim.pushInput('b', { s: sb++, l: true });
+  for (let i = 0; i < 6; i++) { sim.pushInput('a', { s: sa++, hd: true }); sim.pushInput('b', { s: sb++ }); sim.step(); }
+  assert.ok(a.dmg > 0 && !a.att, 'colpito: la carica è annullata');
+
+  const f = onIsland(800);
+  S.stepFighter(f, { ...idleInp, h: true, hd: true });
+  for (let i = 0; i < 12; i++) S.stepFighter(f, { ...idleInp, hd: true });
+  assert.ok(f.att && f.att.c > 0);
+  S.stepFighter(f, { ...idleInp, hd: true, d: true });
+  assert.ok(!f.att && f.dg > 0, 'la schivata interrompe la carica');
+});
