@@ -23,6 +23,7 @@
     jumpMul: 0.9, w: 46, h: 86,
     dodgeTime: 0.28, dodgeCd: 0.9, dodgeSpeed: 520,
     dropTime: 0.25, buffer: 0.15,
+    chargeMax: 2, // secondi massimi di carica del pugno forte
     coyote: 0.1, jumpBuffer: 0.12, // salto ancora possibile appena lasciato il bordo / salto premuto poco prima di atterrare
   };
 
@@ -73,7 +74,7 @@
   function physState(f) {
     const o = {};
     for (const k of FIELDS) o[k] = f[k];
-    o.att = f.att ? { ty: f.att.ty, dir: f.att.dir, t: f.att.t, air: f.att.air, id: f.att.id } : null;
+    o.att = f.att ? { ty: f.att.ty, dir: f.att.dir, t: f.att.t, air: f.att.air, id: f.att.id, c: f.att.c, rel: f.att.rel } : null;
     o.buf = f.buf ? { ty: f.buf.ty, t: f.buf.t } : null;
     return o;
   }
@@ -95,15 +96,23 @@
   const hurtbox = (f) => ({ x: f.x - PHYS.w / 2, y: f.y - PHYS.h, w: PHYS.w, h: PHYS.h });
   const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
+  // Quanto è carico un attacco (0..1).
+  const chargeFrac = (a) => Math.min(1, (a && a.c ? a.c : 0) / PHYS.chargeMax);
+
   // Velocità del passo in avanti dell'attacco in corso (0 se non c'è): decresce nel tempo.
   // In avanti vale tutto, verso il basso un po' meno, verso l'alto poco; in aria la metà.
   function lungeVelocity(f) {
     const a = f.att;
     if (!a) return 0;
-    const lg = MOVES[a.ty].lunge;
-    if (!lg || a.t >= lg.time) return 0;
+    const m = MOVES[a.ty];
+    const lg = m.lunge;
+    if (!lg) return 0;
+    // il forte avanza quando parte il colpo (non mentre si prepara o si carica)
+    if (a.ty === 'heavy' && !a.rel) return 0;
+    const lt = a.ty === 'heavy' ? a.t - m.startup + 0.001 : a.t;
+    if (lt < 0 || lt >= lg.time) return 0;
     const mult = a.dir === 'side' ? 1 : a.dir === 'down' ? 0.6 : 0.35;
-    return f.face * lg.speed * mult * (a.air ? 0.5 : 1) * (1 - 0.6 * (a.t / lg.time));
+    return f.face * lg.speed * mult * (a.air ? 0.5 : 1) * (1 + 0.6 * chargeFrac(a)) * (1 - 0.6 * (lt / lg.time));
   }
 
   // Estremi della superficie su cui si sta in piedi (isola o piattaforma), per non cadere avanzando con un colpo.
@@ -142,9 +151,16 @@
     f.jbuf = inp.j ? PHYS.jumpBuffer : Math.max(0, f.jbuf - dt);
 
     if (f.att) {
-      f.att.t += dt;
-      if (f.att.t >= moveTotal(MOVES[f.att.ty])) f.att = null;
+      const a = f.att, m = MOVES[a.ty];
+      if (a.ty === 'heavy' && !a.rel && a.t + dt >= m.startup) {
+        // fine della preparazione: se il tasto è ancora premuto si carica (al massimo chargeMax secondi), poi parte
+        if (inp.hd && a.c < PHYS.chargeMax) { a.c = Math.min(PHYS.chargeMax, a.c + dt); a.t = m.startup - 0.001; }
+        else { a.rel = true; a.t += dt; }
+      } else a.t += dt;
+      if (a.t >= moveTotal(m)) f.att = null;
     }
+    // la schivata interrompe la carica
+    if (f.att && f.att.ty === 'heavy' && !f.att.rel && f.att.c > 0 && inp.d && f.dodgeCd <= 0) f.att = null;
     if (f.dg > 0) f.dg = Math.max(0, f.dg - dt);
     if (inp.l) f.buf = { ty: 'light', t: PHYS.buffer };
     if (inp.h) f.buf = { ty: 'heavy', t: PHYS.buffer };
@@ -155,7 +171,7 @@
       const dir = inp.up ? 'up' : inp.down ? 'down' : 'side';
       if (Math.abs(mx) > 0.3) f.face = sign(mx);
       f.attN += 1;
-      f.att = { ty: f.buf.ty, dir, t: 0, air: !f.g, id: f.attN };
+      f.att = { ty: f.buf.ty, dir, t: 0, air: !f.g, id: f.attN, c: 0, rel: f.buf.ty !== 'heavy' };
       f.buf = null;
     } else if (free && inp.d && f.dodgeCd <= 0) {
       f.dg = PHYS.dodgeTime;
@@ -269,7 +285,7 @@
   ];
   const colorHex = (id) => (COLORS.find((c) => c.id === id) || {}).hex || null;
 
-  const api = { TICK, STAGE, PHYS, CHARS, MOVES, COLORS, colorHex, newFighter, physState, stepFighter, hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds, lungeVelocity };
+  const api = { TICK, STAGE, PHYS, CHARS, MOVES, COLORS, colorHex, newFighter, physState, stepFighter, hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds, lungeVelocity, chargeFrac };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SpintoniShared = api;
 })(typeof self !== 'undefined' ? self : this);

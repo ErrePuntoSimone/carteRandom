@@ -217,6 +217,7 @@
     let snaps = [], clockOffset = null, last = null;
     let seq = 0, pending = [], pred = null, prevPred = null, lastTickAt = 0, meAlive = false;
     const press = { j: false, l: false, h: false, d: false, dd: false };
+    let heavyBtn = false;           // pulsante Forte tenuto premuto (touch / mouse): serve per caricare il colpo
     const keys = new Set();
     let stick = null;               // joystick sinistro
     let particles = [], rings = [], shake = 0, cardsKey = '';
@@ -253,7 +254,7 @@
       if (ws) { ws.onclose = null; try { ws.close(); } catch { /* ignora */ } ws = null; }
       clearInterval(sendTimer);
       cancelAnimationFrame(raf);
-      stick = null;
+      stick = null; heavyBtn = false;
       for (const b of document.querySelectorAll('.pbtn.on')) b.classList.remove('on');
     }
     function connect() {
@@ -299,8 +300,9 @@
     function onEvent(ev) {
       if (ev.t === 'hit') {
         const heavy = ev.ty === 'heavy';
-        burst(ev.x, ev.y, heavy ? '#ffeb3b' : '#ffffff', heavy ? 18 : 9, heavy ? 520 : 320);
-        rings.push({ x: ev.x, y: ev.y, born: performance.now(), r: heavy ? 70 : 40 });
+        const ch = ev.ch || 0; // quanto era carico il colpo (0..1)
+        burst(ev.x, ev.y, heavy ? '#ffeb3b' : '#ffffff', heavy ? 18 + Math.round(30 * ch) : 9, heavy ? 520 + 300 * ch : 320);
+        rings.push({ x: ev.x, y: ev.y, born: performance.now(), r: heavy ? 70 + 70 * ch : 40 });
         shake = Math.max(shake, Math.min(16, ev.kb / 90));
         if ((ev.id === R.you || ev.by === R.you) && navigator.vibrate) navigator.vibrate(heavy ? 35 : 15);
       } else if (ev.t === 'ko') {
@@ -364,17 +366,18 @@
         if (dy < -28) up = true;
         if (dy > 28) down = true;
       }
-      return { mx, up, down };
+      // Forte tenuto premuto (tastiera o pulsante): carica il colpo, fino a 2 secondi
+      return { mx, up, down, hd: heavyBtn || keys.has('k') || keys.has('x') };
     }
 
     function sendInput() {
       if (!ws || ws.readyState !== 1) return;
       const h = held();
       // giù appena premuto: scende dalle piattaforme
-      const inp = { mx: h.mx, up: h.up, down: h.down, j: press.j, l: press.l, h: press.h, d: press.d, dd: press.dd };
+      const inp = { mx: h.mx, up: h.up, down: h.down, hd: h.hd, j: press.j, l: press.l, h: press.h, d: press.d, dd: press.dd };
       press.j = press.l = press.h = press.d = press.dd = false;
       seq += 1;
-      ws.send(JSON.stringify({ t: 'in', s: seq, mx: +inp.mx.toFixed(3), up: inp.up ? 1 : 0, dn: inp.down ? 1 : 0, j: inp.j ? 1 : 0, l: inp.l ? 1 : 0, h: inp.h ? 1 : 0, d: inp.d ? 1 : 0, dd: inp.dd ? 1 : 0 }));
+      ws.send(JSON.stringify({ t: 'in', s: seq, mx: +inp.mx.toFixed(3), up: inp.up ? 1 : 0, dn: inp.down ? 1 : 0, j: inp.j ? 1 : 0, l: inp.l ? 1 : 0, h: inp.h ? 1 : 0, hd: inp.hd ? 1 : 0, d: inp.d ? 1 : 0, dd: inp.dd ? 1 : 0 }));
       if (pred && meAlive) {
         pending.push({ s: seq, inp });
         prevPred = { ...pred };
@@ -398,7 +401,7 @@
       keys.add(k);
     });
     window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
-    window.addEventListener('blur', () => keys.clear());
+    window.addEventListener('blur', () => { keys.clear(); heavyBtn = false; });
 
     // joystick touch a sinistra, pulsanti a destra
     const game = $('screen-game');
@@ -425,8 +428,8 @@
     game.addEventListener('touchend', endTouch);
     game.addEventListener('touchcancel', endTouch);
     for (const b of document.querySelectorAll('.pbtn')) {
-      const on = (e) => { e.preventDefault(); e.stopPropagation(); press[b.dataset.act] = true; b.classList.add('on'); if (navigator.vibrate) navigator.vibrate(8); };
-      const off = (e) => { e.preventDefault(); b.classList.remove('on'); };
+      const on = (e) => { e.preventDefault(); e.stopPropagation(); press[b.dataset.act] = true; if (b.dataset.act === 'h') heavyBtn = true; b.classList.add('on'); if (navigator.vibrate) navigator.vibrate(8); };
+      const off = (e) => { e.preventDefault(); if (b.dataset.act === 'h') heavyBtn = false; b.classList.remove('on'); };
       b.addEventListener('touchstart', on, { passive: false });
       b.addEventListener('touchend', off);
       b.addEventListener('touchcancel', off);
