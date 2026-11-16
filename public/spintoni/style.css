@@ -1,7 +1,7 @@
 .toast { top: calc(12px + env(safe-area-inset-top)); bottom: auto; z-index: 60; }
 
 /* sala d'attesa */
-.chars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.chars { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
 .char {
   font: inherit; color: var(--text); cursor: pointer; text-align: center;
   background: rgba(0, 0, 0, .22); border: 2px solid transparent; border-radius: 12px; padding: 8px 6px;

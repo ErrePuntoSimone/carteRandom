@@ -89,7 +89,8 @@ un'isola galleggiante e tre piattaforme sospese. Lo scopo è buttare fuori dallo
   si rientra dall'alto con qualche istante di protezione. Vince l'ultimo che resta (vite da 1 a 5, scelte dall'host).
 - **Attacchi:** *pugno* veloce e *forte* lento ma potente, in avanti, verso l'alto o verso il basso (tenendo su o giù).
   In più un salto da terra e uno in aria, la discesa dalle piattaforme e la *schivata* che rende intoccabili per un attimo.
-- **Lottatori originali:** *Pepe* (leggero e veloce), *Gilda* (equilibrata) e *Tonno* (pesante e potente).
+- **Lottatori:** *Pepe* (leggero e veloce), *Gilda* (equilibrata), *Tonno* (pesante e potente) e *Micio*
+  (gatto cavaliere con spada e scudo, solido e preciso).
 - **Colore dei dettagli:** nella sala d'attesa ognuno sceglie un colore (o i colori originali) che si applica a pochi
   dettagli del personaggio: polsini dei guantoni, strisce delle scarpe, fibbia, e la bandana di Pepe, la stella e il
   fermacoda di Gilda, la fascia sulla canottiera di Tonno. I bot ne prendono uno a caso.
@@ -111,6 +112,11 @@ Se le immagini mancano, il gioco usa il disegno a codice (`public/spintoni/draw.
 - **Dettagli colorabili:** accanto a ogni sprite c'è `<personaggio>-mask.png`, con solo i dettagli colorabili in scala
   di grigi (già tagliati dove li coprono braccia o corpo). Il gioco la moltiplica per il colore scelto e la disegna sopra
   il fotogramma, così le ombre restano. Nel disegnatore le zone colorabili sono segnate con `ctx.__acc`.
+- **Importare un personaggio disegnato a parte:** `python3 tools/import-sheet.py tools/sprites/micio/map.json`
+  (è così che è stato aggiunto Micio). Servono uno sprite sheet nella stessa griglia 10×8, anche su sfondo nero, e una
+  "sagoma" (personaggio bianco su nero, con i dettagli colorabili in un colore acceso). Nel file di mappa si indica, per
+  ogni animazione, quali fotogrammi usare: così l'ordine della griglia di origine può essere qualsiasi. Lo strumento
+  rende trasparente lo sfondo, estrae i dettagli colorabili e scrive PNG, maschera e JSON nello schema standard.
 - **Cambiare la grafica:** basta sostituire un `.png` mantenendo lo stesso schema (cella, punto d'appoggio, ordine e
   numero dei fotogrammi del `.json`). Il test `test/spintoni-sprites.test.js` controlla che lo schema sia rispettato.
 - **Temporizzazione:** i pugni hanno tre fasi (carica, colpo, recupero) che seguono i tempi del gioco, così il fotogramma
@@ -159,7 +165,7 @@ public/poker/          interfaccia del Poker
 public/briscola/       interfaccia della Briscola
 public/arena/          Rissa: codice condiviso, disegno su canvas e interfaccia
 public/spintoni/       Spintoni: fisica condivisa, disegno, sprite e interfaccia
-tools/                 generatore degli sprite PNG (solo per sviluppo)
+tools/                 generatore e importatore degli sprite PNG (solo per sviluppo)
 public/fiches/         Conta fiches (solo lato browser)
 test/                  test automatici
 ```
