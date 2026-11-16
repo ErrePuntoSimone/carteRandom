@@ -37,7 +37,8 @@ function sendFile(res, file) {
   fs.readFile(file, (err, data) => {
     if (err) return sendJson(res, 404, { error: 'Non trovato' });
     const headers = { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' };
-    if (path.extname(file) === '.png') headers['Cache-Control'] = 'public, max-age=300'; // immagini: cache breve
+    // immagini: cache breve; il resto va sempre riscaricato (niente versioni vecchie sul telefono dopo un aggiornamento)
+    headers['Cache-Control'] = path.extname(file) === '.png' ? 'public, max-age=300' : 'no-cache';
     res.writeHead(200, headers);
     res.end(data);
   });

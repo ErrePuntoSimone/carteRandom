@@ -114,7 +114,7 @@
     if (session) PublicRoom.update('spintoni', state, session);
     R = state;
     const g = R.game;
-    if (g.phase === 'playing') Game.start(g.matchNo);
+    if (g.phase === 'playing') { Game.start(g.matchNo); Game.setCountdown(g.cd); }
     else {
       if (Game.running()) Game.stop();
       $('screen-game').hidden = true;
@@ -242,7 +242,8 @@
       $('screen-lobby').hidden = true;
       $('screen-game').hidden = false;
       $('banner').hidden = true;
-      $('countdown').hidden = true; cdShown = false;
+      $('countdown').hidden = true; cdShown = false; cdEnd = 0;
+      clearInterval(cdTimer); cdTimer = setInterval(cdTick, 100);
       snaps = []; last = null; clockOffset = null;
       seq = 0; pending = []; pred = null; prevPred = null; meAlive = false;
       particles = []; rings = []; shake = 0; cardsKey = '';
@@ -254,7 +255,7 @@
     function stop() {
       active = false;
       if (ws) { ws.onclose = null; try { ws.close(); } catch { /* ignora */ } ws = null; }
-      clearInterval(sendTimer);
+      clearInterval(sendTimer); clearInterval(cdTimer);
       cancelAnimationFrame(raf);
       stick = null; heavyBtn = false;
       for (const b of document.querySelectorAll('.pbtn.on')) b.classList.remove('on');
@@ -331,11 +332,15 @@
       if (particles.length > 500) particles.splice(0, particles.length - 500);
     }
 
-    let cdShown = false, goTimer = null;
-    function updateCountdown(m) {
+    // conto alla rovescia: la fine arriva sia dallo stato della stanza (SSE) sia dagli snapshot, così si vede anche
+    // se la connessione in tempo reale ci mette un po' ad aprirsi
+    let cdShown = false, goTimer = null, cdEnd = 0, cdTimer = null;
+    function setCountdown(sec) { cdEnd = performance.now() + (Number(sec) || 0) * 1000; }
+    function cdTick() {
       const el = $('countdown');
-      if (m.cd > 0) {
-        const n = String(Math.ceil(m.cd));
+      const left = (cdEnd - performance.now()) / 1000;
+      if (left > 0) {
+        const n = String(Math.ceil(left));
         if (el.textContent !== n || el.hidden) { el.textContent = n; el.hidden = false; el.classList.remove('go'); el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
         cdShown = true;
       } else if (cdShown) {
@@ -347,7 +352,7 @@
     }
 
     function updateHud(m) {
-      updateCountdown(m);
+      setCountdown(m.cd);
       const left = Math.ceil(m.left);
       $('timer').textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
       const list = m.f.slice().sort((a, b) => a.sl - b.sl);
@@ -564,7 +569,7 @@
       }
     }
 
-    return { start, stop, running: () => active };
+    return { start, stop, setCountdown, running: () => active };
   })();
 
   // ---------- home e pulsanti ----------
