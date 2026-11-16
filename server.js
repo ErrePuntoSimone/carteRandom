@@ -28,6 +28,7 @@ const MIME = {
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml',
+  '.png': 'image/png',
   '.json': 'application/json; charset=utf-8',
   '.webmanifest': 'application/manifest+json',
 };
@@ -35,7 +36,9 @@ const MIME = {
 function sendFile(res, file) {
   fs.readFile(file, (err, data) => {
     if (err) return sendJson(res, 404, { error: 'Non trovato' });
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+    const headers = { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' };
+    if (path.extname(file) === '.png') headers['Cache-Control'] = 'public, max-age=300'; // immagini: cache breve
+    res.writeHead(200, headers);
     res.end(data);
   });
 }
