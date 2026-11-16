@@ -172,11 +172,14 @@ class Sim {
         const r = (p.ang * Math.PI) / 180;
         const kind = `${f.char}:${f.att.ty.replace('sp:', '')}`;
         const x = f.x + f.face * (p.dx || 0), y = f.y + (p.dy || 0);
+        const vx = Math.cos(r) * p.speed * f.face;
         this.shots.push({
           id: ++this.shotSeq, owner: f.id, kind, ty: f.att.ty, x, y,
-          vx: Math.cos(r) * p.speed * f.face, vy: Math.sin(r) * p.speed, grav: p.grav || 0, life: p.life,
-          w: p.box.w, h: p.box.h, face: f.face, hit: new Set(), dmg: p.dmg, base: p.base, growth: p.growth,
-          kbAng: p.kbAng, pierce: !!p.pierce, debuff: p.debuff || null, noLaunch: !!p.noLaunch,
+          vx, vy: Math.sin(r) * p.speed, grav: p.grav || 0, life: p.life,
+          // lancia verso dove vola (un proiettile all'indietro spinge all'indietro)
+          w: p.box.w, h: p.box.h, face: Math.abs(vx) > 1e-6 ? Math.sign(vx) : f.face, hit: new Set(), dmg: p.dmg, base: p.base, growth: p.growth,
+          kbAng: p.kbAng, pierce: !!(p.pierce || p.returns), debuff: p.debuff || null, noLaunch: !!p.noLaunch,
+          ret: p.returns ? p.life / 2 : 0, // a metà vita torna indietro e può colpire di nuovo
         });
         this.events.push({ t: 'shot', id: f.id, kind, x: r1(x), y: r1(y) });
       });
@@ -190,6 +193,7 @@ class Sim {
       s.vy += s.grav * dt;
       s.x += s.vx * dt; s.y += s.vy * dt;
       s.life -= dt;
+      if (s.ret && s.life <= s.ret) { s.ret = 0; s.vx = -s.vx; s.vy = -s.vy; s.face = -s.face; s.hit.clear(); }
       if (s.life <= 0 || s.x < B.l || s.x > B.r || s.y < B.t || s.y > B.b
         || (s.x > m.x && s.x < m.x + m.w && s.y > m.y && s.y < m.y + m.h)) { s.dead = true; continue; }
       const box = { x: s.x - s.w / 2, y: s.y - s.h / 2, w: s.w, h: s.h };
@@ -322,9 +326,12 @@ class Sim {
         return inp;
       }
       const cs = S.CHARS[f.char].specials;
-      // proiettili a distanza media, le altre da vicino
-      const ready = S.SLOTS.filter((k) => S.meterFull(f, k)
-        && (cs[k].projectile ? dist >= 150 && dist <= 600 && Math.abs(dy) < 120 : dist < 150));
+      // proiettili fin dove arrivano (quelli ad arco non da vicino), le altre da vicino
+      const inRange = (k) => {
+        const p = [].concat(cs[k].projectile)[0];
+        return dist >= (p.grav ? 380 : 150) && dist <= Math.min(600, p.speed * p.life) && Math.abs(dy) < 120;
+      };
+      const ready = S.SLOTS.filter((k) => S.meterFull(f, k) && (cs[k].projectile ? inRange(k) : dist < 150));
       if (ready.length && !(f.att && f.att.ty.startsWith('sp:')) && this.rng() < 0.35) {
         const k = ready[Math.floor(this.rng() * ready.length)];
         f.face = dx >= 0 ? 1 : -1;
