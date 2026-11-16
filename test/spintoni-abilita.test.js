@@ -13,6 +13,7 @@ const specials = {
 const stats = { speed: 500, jump: 1000, weight: 1, power: 1 };
 S.registerChar({ id: 'test_ab', name: 'Ab', desc: '', stats, specials, meter: { move: 1, hit: 0 } });
 S.registerChar({ id: 'test_ab_hit', name: 'AbHit', desc: '', stats, specials, meter: { move: 0, hit: 1 } });
+S.registerChar({ id: 'test_plain', name: 'Plain', desc: '', stats }); // senza speciali nascoste
 
 test('abilità: moveOf risolve le speciali', () => {
   assert.strictEqual(S.moveOf('test_ab', 'sp:heavy').name, 'Pesante');
@@ -21,8 +22,8 @@ test('abilità: moveOf risolve le speciali', () => {
 });
 
 test('abilità: personaggi senza specials non hanno barre', () => {
-  assert.strictEqual(S.newFighter(0, 0, 'gilda').mt, null);
-  assert.strictEqual(S.physState(S.newFighter(0, 0, 'gilda')).mt, null);
+  assert.strictEqual(S.newFighter(0, 0, 'test_plain').mt, null);
+  assert.strictEqual(S.physState(S.newFighter(0, 0, 'test_plain')).mt, null);
 });
 
 test('abilità: correre carica le barre in base al carattere', () => {
@@ -129,7 +130,7 @@ test('suprema: ignorata in volo dopo un colpo', () => {
 });
 
 test('tenuto: personaggi senza specials ignorano hb e ul', () => {
-  const a = ground('gilda'), b = ground('gilda');
+  const a = ground('test_plain'), b = ground('test_plain');
   S.stepFighter(a, { ...idle, l: true, hb: 15, ul: true });
   S.stepFighter(b, { ...idle, l: true });
   hold(a, { hb: 15, ul: true, hd: true }, 15);
@@ -366,6 +367,106 @@ test('pepe: kit completo', () => {
   assert.ok(u.a.sts.some((s) => s.k === 'b'));
 });
 
+// ---- kit di Gilda, Micio e Tonno ----
+// lancia la speciale `slot` di `char` con un bersaglio a `dist` davanti e guarda cosa succede in 2 secondi
+function provaKit(char, slot, dist = 300) {
+  const [sim, a, b] = duel(char, 'test_ab');
+  a.x = 700; a.y = b.y = S.STAGE.main.y; a.g = b.g = true; b.x = 700 + dist; a.face = 1;
+  a.att = { ty: 'sp:' + slot, dir: 'side', t: 0, air: false, id: 1, c: 0, rel: true };
+  let shots = 0, hitArmored = false;
+  for (let i = 0; i < 60; i++) {
+    sim.step(); shots = Math.max(shots, sim.shots.length);
+    if (a.att && S.inWindow(a, 'armor')) hitArmored = true;
+  }
+  return { sim, a, b, shots, hitArmored };
+}
+
+test('kit: Gilda, Micio e Tonno hanno 4 speciali e la suprema con i nomi approvati', () => {
+  const nomi = {
+    gilda: ['Stella cadente', 'Pugno stellare', 'Scudo di stelle', 'Incantesimo', 'Pioggia di stelle'],
+    micio: ["Fendente d'aria", 'Scudo boomerang', 'Postura del cavaliere', 'Carica di cavalleria', 'Mille fendenti'],
+    tonno: ["Sputo d'acqua", 'Tuffo bomba', 'Furia', 'Onda', 'Maremoto'],
+  };
+  for (const [c, n] of Object.entries(nomi)) {
+    const sp = S.CHARS[c].specials;
+    assert.deepStrictEqual(['light', 'heavy', 'dodge', 'special', 'ultimate'].map((k) => sp[k].name), n, c);
+    assert.ok(sp.heavy.charge > sp.light.charge, c);
+    const m = S.CHARS[c].meter;
+    assert.ok(Math.abs(m.move + m.hit - 1) < 1e-9, c);
+  }
+  // carattere: Gilda a metà, Micio colpendo, Tonno quasi solo colpendo
+  assert.ok(S.CHARS.gilda.meter.hit < S.CHARS.micio.meter.hit && S.CHARS.micio.meter.hit < S.CHARS.tonno.meter.hit);
+});
+
+test('kit Gilda: stella ad arco, pugno corazzato, scudo, incantesimo, pioggia di stelle', () => {
+  const st = provaKit('gilda', 'light', 430); // ricade a media distanza
+  assert.strictEqual(st.shots, 1); assert.ok(st.b.dmg > 0);
+  const pu = provaKit('gilda', 'heavy', 150);
+  assert.ok(pu.b.dmg > 0 && pu.hitArmored);
+  const sc = provaKit('gilda', 'dodge');
+  assert.ok(Math.abs(S.statOf(sc.a, 'weight') - 1.3) < 1e-9);
+  const inc = provaKit('gilda', 'special', 80);
+  assert.ok(Math.abs(S.statOf(inc.b, 'power') - 0.7) < 1e-9);
+  const pi = provaKit('gilda', 'ultimate');
+  assert.strictEqual(pi.shots, 5);
+  assert.ok(S.statOf(pi.a, 'power') > 1);
+});
+
+test('kit Micio: lama che attraversa, scudo boomerang, postura, carica, mille fendenti', () => {
+  const fe = provaKit('micio', 'light');
+  assert.strictEqual(fe.shots, 1); assert.ok(fe.b.dmg > 0);
+  const po = provaKit('micio', 'dodge');
+  assert.ok(Math.abs(S.statOf(po.a, 'power') - 1.1 * 1.25) < 1e-9);
+  const ca = provaKit('micio', 'special', 250);
+  assert.ok(ca.b.dmg > 0 && ca.hitArmored);
+  const mf = provaKit('micio', 'ultimate');
+  assert.strictEqual(mf.shots, 5); assert.ok(mf.hitArmored);
+});
+
+test('boomerang: lo scudo torna indietro e colpisce di nuovo al ritorno', () => {
+  // bersaglio fermo e invulnerabile ai lanci: colpito all'andata e al ritorno
+  const [sim, a, b] = duel('micio', 'test_ab');
+  a.x = 700; a.y = b.y = S.STAGE.main.y; a.g = b.g = true; b.x = 900; a.face = 1;
+  a.att = { ty: 'sp:heavy', dir: 'side', t: 0, air: false, id: 1, c: 0, rel: true };
+  let hits = 0, maxX = 0, backX = null;
+  for (let i = 0; i < 60; i++) {
+    b.x = 900; b.vx = b.vy = 0; b.hs = 0; // resta lì
+    sim.step();
+    hits += sim.events.filter((e) => e.t === 'hit' && e.id === 'b').length;
+    const s = sim.shots[0];
+    if (s) { maxX = Math.max(maxX, s.x); if (s.vx < 0) backX = s.x; }
+  }
+  assert.ok(backX !== null && backX < maxX, 'torna indietro');
+  assert.strictEqual(hits, 2);
+});
+
+test('kit Tonno: sputo che rallenta, tuffo bomba, furia, onda, maremoto da due lati', () => {
+  const sp = provaKit('tonno', 'light', 200);
+  assert.ok(sp.b.dmg > 0 && sp.b.sts.some((s) => s.k === 'd'));
+  const tu = provaKit('tonno', 'heavy', 100);
+  assert.ok(tu.b.dmg > 0); assert.ok(tu.a.g, 'atterrato');
+  const fu = provaKit('tonno', 'dodge');
+  assert.ok(S.statOf(fu.a, 'speed') > 390 && S.statOf(fu.a, 'power') > 1.28);
+  const on = provaKit('tonno', 'special', 400);
+  assert.strictEqual(on.shots, 1); assert.ok(on.b.dmg > 0);
+  // Maremoto: l'onda all'indietro spinge all'indietro chi sta dietro
+  const [sim, a, b] = duel('tonno', 'test_ab');
+  a.x = 1000; a.y = b.y = S.STAGE.main.y; a.g = b.g = true; b.x = 750; a.face = 1;
+  a.att = { ty: 'sp:ultimate', dir: 'side', t: 0, air: false, id: 1, c: 0, rel: true };
+  let shots = 0;
+  for (let i = 0; i < 40; i++) { sim.step(); shots = Math.max(shots, sim.shots.length); }
+  assert.strictEqual(shots, 2);
+  assert.ok(b.dmg > 0 && b.x < 750, `dietro e spinto indietro: x=${b.x}`);
+});
+
+test('tuffo bomba: non porta Tonno oltre il bordo in alto', () => {
+  const f = ground('tonno'); castSp(f, 'heavy');
+  let minY = f.y;
+  for (let i = 0; i < 40; i++) { S.stepFighter(f, idle); minY = Math.min(minY, f.y); }
+  assert.ok(minY > S.STAGE.blast.t);
+  assert.ok(f.g && Math.abs(f.y - S.STAGE.main.y) < 1);
+});
+
 // ---- bot ----
 function seededBot(seed) { let s = seed; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; }
 function botDuel(dist, full) {
@@ -447,7 +548,7 @@ test('pepe: le speciali senza zona di colpo non colpiscono in mischia', () => {
 });
 
 test('snapshot: ph senza barre né stati vuoti, barre al millesimo e stati senza at/dur', () => {
-  const [sim, a] = duel('pepe', 'gilda');
+  const [sim, a] = duel('pepe', 'test_plain');
   for (let i = 0; i < 7; i++) { sim.pushInput('a', { s: i + 1, mx: 1 }); sim.step(); }
   const pg = sim.snapshot('b').f.find((x) => x.id === 'b').ph;
   for (const k of ['mt', 'ht', 'spArm', 'sts']) assert.ok(!(k in pg), k);

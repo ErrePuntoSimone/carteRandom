@@ -180,3 +180,11 @@ correndo e saltando).
 - Formato esatto di input e snapshot, purché compatto.
 - Disegno grafico di proiettili, aure e anelli (nello stile `fx`).
 - Se il pulsante Speciale tenga il `cooldown` della speciale base: proposta di tenerlo.
+
+## Seguito: kit di Gilda, Micio e Tonno (approvati dall'utente)
+
+Stesso schema di Pepe, con un carattere diverso per ognuno: Gilda mista (`meter` 0,5/0,5), Micio da vicino e media
+distanza (0,4/0,6), Tonno da vicino (0,25/0,75). Nomi e mosse come nel README ("Kit di Gilda/Micio/Tonno").
+Mattone nuovo: `returns` sul proiettile (Scudo boomerang): a metà vita inverte la direzione e può colpire di nuovo
+(implica `pierce`). Un proiettile lancia verso dove vola, così l'onda all'indietro del Maremoto spinge all'indietro.
+Numeri da tarare giocando.
