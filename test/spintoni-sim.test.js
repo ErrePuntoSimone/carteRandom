@@ -136,3 +136,89 @@ test('la partita finisce quando resta un solo lottatore; i bot giocano e risalgo
   assert.ok(totalKo >= 2, `cadute: ${totalKo}`);
   assert.ok(res.reduce((s, r) => s + r.kos, 0) >= 1, 'almeno un KO a pugni');
 });
+
+// ---------- fluidità: passo in avanti, salto perdonato, salto anticipato, annullo del recupero ----------
+const idleInp = { mx: 0, up: false, down: false, j: false, l: false, h: false, d: false, dd: false };
+const run = (f, inp, n) => { for (let i = 0; i < n; i++) S.stepFighter(f, i === 0 ? inp : idleInp); };
+const onIsland = (x, char = 'gilda') => { const f = S.newFighter(x, S.STAGE.main.y, char); f.g = true; return f; };
+
+test('colpendo si fa un passo in avanti: di più con il forte, poco verso l\'alto, mai in aria come a terra', () => {
+  const dist = (ty, dir, air = false) => {
+    const f = onIsland(800);
+    if (air) { f.y -= 120; f.g = false; }
+    const x0 = f.x;
+    run(f, { ...idleInp, [ty === 'light' ? 'l' : 'h']: true, up: dir === 'up', down: dir === 'down' }, 40);
+    return f.x - x0;
+  };
+  const light = dist('light', 'side'), heavy = dist('heavy', 'side');
+  assert.ok(light > 8 && light < 24, `pugno veloce: ${light.toFixed(1)}`);
+  assert.ok(heavy > 20 && heavy < 45, `pugno forte: ${heavy.toFixed(1)}`);
+  assert.ok(heavy > light * 1.5, 'il forte avanza di più');
+  assert.ok(dist('heavy', 'up') < heavy * 0.5, 'verso l\'alto avanza poco');
+  assert.ok(dist('heavy', 'side', true) < heavy, 'in aria avanza meno');
+  // si avanza nella direzione in cui si guarda
+  const f = onIsland(800); f.face = -1;
+  run(f, { ...idleInp, mx: -1, l: true }, 20);
+  assert.ok(f.x < 800);
+});
+
+test('il passo in avanti non fa cadere dall\'isola né dalle piattaforme', () => {
+  const m = S.STAGE.main;
+  const f = onIsland(m.x + m.w - 12);
+  run(f, { ...idleInp, h: true }, 60);
+  assert.ok(f.g && f.x <= m.x + m.w - 8, `x=${f.x.toFixed(1)}`);
+  const p = S.STAGE.plats[0];
+  const g = S.newFighter(p.x + p.w - 12, p.y, 'pepe'); g.g = true; g.onPlat = true;
+  run(g, { ...idleInp, h: true }, 60);
+  assert.ok(g.g && g.y === p.y, 'resta sulla piattaforma');
+});
+
+test('salto perdonato: subito dopo aver lasciato il bordo si salta ancora da terra, senza perdere il doppio salto', () => {
+  const m = S.STAGE.main;
+  const walkOff = () => {
+    const f = onIsland(m.x + m.w - 5);
+    for (let i = 0; i < 40 && f.g; i++) S.stepFighter(f, { ...idleInp, mx: 1 });
+    assert.ok(!f.g, 'è nel vuoto');
+    return f;
+  };
+  const f = walkOff();
+  assert.ok(f.coyote > 0, 'ancora in tolleranza');
+  S.stepFighter(f, { ...idleInp, j: true });
+  assert.ok(f.vy < -900, `salto da terra: vy=${f.vy.toFixed(0)}`);
+  assert.strictEqual(f.jumps, 1, 'il doppio salto è ancora disponibile');
+  // dopo la tolleranza è un normale doppio salto
+  const late = walkOff();
+  for (let i = 0; i < 5; i++) S.stepFighter(late, idleInp);
+  assert.strictEqual(late.coyote, 0);
+  S.stepFighter(late, { ...idleInp, j: true });
+  assert.strictEqual(late.jumps, 0, 'ormai usa il doppio salto');
+});
+
+test('salto anticipato: se il doppio salto è già usato, il salto premuto poco prima di atterrare parte da solo', () => {
+  const f = S.newFighter(800, S.STAGE.main.y - 30, 'gilda');
+  f.vy = 300; f.jumps = 0; // sta cadendo e non ha più salti in aria
+  S.stepFighter(f, { ...idleInp, j: true });
+  assert.ok(f.vy > 0 && f.jbuf > 0, 'niente salto in aria: resta in memoria');
+  for (let i = 0; i < 10 && f.vy >= 0; i++) S.stepFighter(f, idleInp);
+  assert.ok(f.vy < 0, 'atterrato e saltato da solo');
+  // premuto troppo presto non vale
+  const g = S.newFighter(800, S.STAGE.main.y - 400, 'gilda');
+  g.vy = 300; g.jumps = 0;
+  S.stepFighter(g, { ...idleInp, j: true });
+  for (let i = 0; i < 30; i++) S.stepFighter(g, idleInp);
+  assert.ok(g.vy >= 0 || g.g, 'dopo troppo tempo il salto in memoria è scaduto');
+});
+
+test('saltando durante il recupero di un colpo lo si annulla', () => {
+  const f = onIsland(800);
+  S.stepFighter(f, { ...idleInp, h: true });
+  assert.ok(f.att);
+  for (let i = 0; i < 4; i++) S.stepFighter(f, idleInp);      // ancora in carica: il salto non parte
+  S.stepFighter(f, { ...idleInp, j: true });
+  assert.ok(f.att && f.g, 'in carica non si salta');
+  const rec = S.MOVES.heavy.startup + S.MOVES.heavy.active;
+  while (f.att && f.att.t < rec) S.stepFighter(f, idleInp);
+  assert.ok(f.att, 'siamo nel recupero');
+  S.stepFighter(f, { ...idleInp, j: true });
+  assert.ok(!f.att && !f.g && f.vy < 0, 'recupero annullato dal salto');
+});
