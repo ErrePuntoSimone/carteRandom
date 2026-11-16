@@ -104,6 +104,11 @@
     for (const s of f.sts) if (s[key] !== undefined) v *= s[key];
     return v;
   }
+  // un buff (o debuff) nuovo rinnova quello dello stesso tipo invece di sommarsi; si tengono solo t e i moltiplicatori
+  function addStatus(f, k, { at, dur, ...mul }) {
+    f.sts = f.sts.filter((s) => s.k !== k);
+    f.sts.push({ k, t: dur, ...mul });
+  }
   const meterFull = (f, slot) => !!f.mt && f.mt[slot] >= CHARS[f.char].specials[slot].charge;
 
   const sign = (v) => (v > 0 ? 1 : v < 0 ? -1 : 0);
@@ -158,7 +163,7 @@
   function hitbox(f) {
     if (!isActive(f)) return null;
     const b = moveOf(f.char, f.att.ty).boxes[f.att.dir];
-    if (!b) return null;
+    if (!b || !b.w || !b.h) return null; // zona vuota (speciali senza colpo in mischia): nessun colpo
     const x = f.face > 0 ? f.x + b.x : f.x - b.x - b.w;
     return { x, y: f.y + b.y, w: b.w, h: b.h };
   }
@@ -240,7 +245,7 @@
         else { a.rel = true; a.t += dt; }
       } else a.t += dt;
       // il buff della mossa parte una volta sola, quando si supera il suo istante
-      if (m.buff && !a.bf && a.t >= m.buff.at) { a.bf = true; f.sts.push({ k: 'b', t: m.buff.dur, ...m.buff }); }
+      if (m.buff && !a.bf && a.t >= m.buff.at) { a.bf = true; addStatus(f, 'b', m.buff); }
       if (a.t >= attackTotal(f)) f.att = null;
     }
     // la schivata interrompe la carica
@@ -344,8 +349,10 @@
       const prev = f.ht[slot];
       f.ht[slot] += dt;
       if (prev > PHYS.holdSpecial || f.ht[slot] <= PHYS.holdSpecial) return;
-      // Potenziato tenuto da solo resta il pugno caricato: la sua speciale vuole anche giù
-      if (f.spArm[slot] && meterFull(f, slot) && (slot !== 'heavy' || inp.down)) {
+      // Potenziato tenuto da solo resta il pugno caricato: la sua speciale vuole anche giù;
+      // Speciale tenuta mentre si rientra in aria (mossa con recover) non interrompe il rientro
+      const rientro = slot === 'special' && f.att && f.att.air && moveOf(f.char, f.att.ty).recover;
+      if (f.spArm[slot] && meterFull(f, slot) && (slot !== 'heavy' || inp.down) && !rientro) {
         f.mt[slot] = 0;
         startSpecial(f, 'sp:' + slot);
       }
@@ -428,7 +435,7 @@
   const SNAP_DEFAULTS = { vx: 0, vy: 0, a: null, hs: 0, dg: 0, inv: false };
 
   const api = {
-    TICK, SEND_EVERY, SNAP_DEFAULTS, STAGE, PHYS, CHARS, MOVES, ATTACKS, COLORS, colorHex, registerChar, moveOf, SLOTS, statOf, addMeter, meterFull, inWindow, newFighter, physState, stepFighter,
+    TICK, SEND_EVERY, SNAP_DEFAULTS, STAGE, PHYS, CHARS, MOVES, ATTACKS, COLORS, colorHex, registerChar, moveOf, SLOTS, statOf, addMeter, addStatus, meterFull, inWindow, newFighter, physState, stepFighter,
     hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds, lungeVelocity, chargeFrac, attackTotal,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

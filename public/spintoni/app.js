@@ -291,7 +291,8 @@
       const me = snap.f.get(R.you);
       meAlive = !!(me && me.al);
       if (me && me.al && me.ph) {
-        const base = JSON.parse(JSON.stringify(me.ph));
+        // il server non manda barre e stati vuoti: si rimettono prima di riapplicare gli input
+        const base = { mt: null, ht: null, spArm: null, sts: [], ...JSON.parse(JSON.stringify(me.ph)) };
         pending = pending.filter((i) => i.s > m.ack);
         if (m.cd > 0) pending = []; // conto alla rovescia: il server ignora gli input
         for (const i of pending) S.stepFighter(base, i.inp);
@@ -466,7 +467,10 @@
       keys.add(k);
     });
     window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
-    window.addEventListener('blur', () => { keys.clear(); btnHeld.clear(); });
+    // tasto del mouse rilasciato fuori dal pulsante (o finestra lasciata): nessun pulsante resta tenuto
+    const releaseBtns = () => { btnHeld.clear(); for (const b of document.querySelectorAll('.pbtn.on')) b.classList.remove('on'); };
+    window.addEventListener('blur', () => { keys.clear(); releaseBtns(); });
+    window.addEventListener('mouseup', releaseBtns);
 
     // joystick touch a sinistra, pulsanti a destra
     const game = $('screen-game');
@@ -561,12 +565,12 @@
         if (f0 && f0.al === f1.al && Math.hypot(f1.x - f0.x, f1.y - f0.y) < 300) out.push({ ...f1, x: f0.x + (f1.x - f0.x) * t, y: f0.y + (f1.y - f0.y) * t });
         else out.push(f1);
       }
-      // proiettili: come gli avversari, solo quelli presenti in entrambi gli snapshot
+      // proiettili: interpolati come gli avversari; quelli appena nati (solo nel secondo snapshot) dove sono in quello
       const pa = new Map((a.raw.p || []).map((p) => [p[0], p]));
       const shots = [];
       for (const [id, kind, x, y, face] of b.raw.p || []) {
         const p0 = pa.get(id);
-        if (p0) shots.push([id, kind, p0[2] + (x - p0[2]) * t, p0[3] + (y - p0[3]) * t, face]);
+        shots.push(p0 ? [id, kind, p0[2] + (x - p0[2]) * t, p0[3] + (y - p0[3]) * t, face] : [id, kind, x, y, face]);
       }
       return { list: out, shots };
     }

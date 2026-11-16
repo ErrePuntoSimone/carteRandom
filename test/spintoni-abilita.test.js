@@ -202,6 +202,13 @@ test('barre: colpire carica chi colpisce, ricevere carica a metà', () => {
   assert.ok(Math.abs(a.mt.light - 2 * v.mt.light) < 1e-9);
 });
 
+test('barre: chi riceve carica con il proprio meter.hit, non con quello di chi colpisce', () => {
+  const [sim, a, v] = duel('test_ab_hit', 'test_sh'); // test_sh ha meter.hit = 0
+  sim.launch(a, v, hitOpts);
+  assert.ok(a.mt.light > 0);
+  assert.deepStrictEqual(v.mt, { light: 0, heavy: 0, dodge: 0, special: 0 });
+});
+
 test('barre: la parata carica anche chi para', () => {
   const [sim, a, v] = duel('test_ab_hit', 'test_ab_hit');
   sim.counterHit(v, a, { dmg: 10, base: 300, growth: 5, ang: 0 });
@@ -311,11 +318,12 @@ test('proiettile: resta in volo se chi l\'ha lanciato va KO e il KO vale per lui
 test('proiettile: nello snapshot', () => {
   const [sim] = shotDuel();
   assert.strictEqual(sim.snapshot('a').p, undefined);
-  run(sim, 4);
+  const evs = [];
+  for (let i = 0; i < 4; i++) { sim.step(); evs.push(...sim.events); }
+  assert.deepStrictEqual(evs.filter((e) => e.t === 'shot').map((e) => [e.id, e.kind]), [['a', 'test_sh:light']]);
   const p = sim.snapshot('b').p;
   assert.strictEqual(p[0].length, 5);
   assert.strictEqual(p[0][1], 'test_sh:light');
-  assert.ok(sim.events.concat([]).length >= 0);
 });
 
 test('proiettile: sparisce contro l\'isola', () => {
@@ -348,8 +356,9 @@ test('pepe: kit completo', () => {
   assert.strictEqual(prova('heavy').shots, 1);
   assert.ok(prova('dodge').a.sts.some((s) => s.k === 'b'));
   const p = prova('special', 100);
-  assert.ok(p.b.sts.some((s) => s.k === 'd'));
-  assert.ok(p.b.dmg > 0 || p.b.sts.length);
+  const d = p.b.sts.find((s) => s.k === 'd');
+  assert.ok(d && d.speed === 0.6 && d.jump === 0.75);
+  assert.ok(Math.abs(S.statOf(p.b, 'speed') - 500 * 0.6) < 1e-9);
   assert.strictEqual(p.b.vx, 0);
   const u = prova('ultimate');
   assert.strictEqual(u.shots, 5);
@@ -376,4 +385,87 @@ test('bot: usa la suprema e le speciali quando sono pronte', () => {
   assert.ok(botDuel(100, ['special']).run(5).has('sp:special'));
   assert.ok(botDuel(300, ['light']).run(5).has('sp:light'));
   assert.ok(botDuel(400, ['heavy']).run(5).has('sp:heavy'));
+});
+
+// ---- correzioni finali ----
+const castSp = (f, slot) => { f.att = { ty: 'sp:' + slot, dir: 'side', t: 0, air: !f.g, id: 99, c: 0, rel: true }; };
+
+test('turbo: con il Turbo il triplo salto di Pepe non esce dal bordo in alto', () => {
+  const f = ground('pepe');
+  castSp(f, 'dodge'); hold(f, {}, 1);
+  assert.ok(f.sts.some((s) => s.k === 'b'));
+  f.att = null;
+  let jumps = 3, minY = f.y;
+  S.stepFighter(f, { ...idle, j: true }); jumps--;
+  for (let i = 0; i < 120; i++) {
+    const j = jumps > 0 && !f.g && f.vy >= 0; // ogni salto in aria all'apice
+    if (j) jumps--;
+    S.stepFighter(f, { ...idle, j });
+    minY = Math.min(minY, f.y);
+  }
+  assert.strictEqual(jumps, 0);
+  assert.ok(minY > S.STAGE.blast.t, `apice ${minY}`);
+});
+
+test('turbo: due Turbo non si sommano, il secondo rinnova il primo', () => {
+  const f = ground('pepe');
+  castSp(f, 'dodge'); hold(f, {}, 20);
+  castSp(f, 'ultimate'); hold(f, {}, 1);
+  assert.strictEqual(f.sts.filter((s) => s.k === 'b').length, 1);
+  assert.ok(Math.abs(S.statOf(f, 'speed') - 720 * 1.4) < 1e-9);
+  assert.ok(f.sts[0].t > 3.9); // rinnovato
+});
+
+test('polverone: due debuff non rallentano più di uno', () => {
+  const [sim, a, v] = duel('pepe', 'test_ab');
+  const debuff = S.CHARS.pepe.specials.special.debuff;
+  sim.launch(a, v, { ...hitOpts, noLaunch: true, debuff });
+  sim.launch(a, v, { ...hitOpts, noLaunch: true, debuff });
+  assert.strictEqual(v.sts.length, 1);
+  assert.ok(Math.abs(S.statOf(v, 'speed') - 500 * 0.6) < 1e-9);
+});
+
+test('pepe: le speciali senza zona di colpo non colpiscono in mischia', () => {
+  for (const slot of ['dodge', 'light', 'heavy']) {
+    const f = ground('pepe'); castSp(f, slot);
+    f.att.t = S.moveOf('pepe', f.att.ty).startup; // colpo attivo
+    assert.ok(S.isActive(f), slot);
+    assert.strictEqual(S.hitbox(f), null, slot);
+  }
+  // Pepe appena sopra l'avversario: il punto (0,0) della zona vuota cadrebbe dentro di lui
+  const [sim, a, b] = duel('pepe', 'test_ab');
+  a.x = b.x = 700; b.y = S.STAGE.main.y; a.y = b.y - 40; a.g = false; a.face = 1;
+  castSp(a, 'dodge');
+  const evs = [];
+  for (let i = 0; i < 5; i++) { sim.step(); evs.push(...sim.events); }
+  assert.deepStrictEqual(evs.filter((e) => e.t === 'hit'), []);
+  assert.strictEqual(b.dmg, 0);
+});
+
+test('snapshot: ph senza barre né stati vuoti, barre al millesimo e stati senza at/dur', () => {
+  const [sim, a] = duel('pepe', 'gilda');
+  for (let i = 0; i < 7; i++) { sim.pushInput('a', { s: i + 1, mx: 1 }); sim.step(); }
+  const pg = sim.snapshot('b').f.find((x) => x.id === 'b').ph;
+  for (const k of ['mt', 'ht', 'spArm', 'sts']) assert.ok(!(k in pg), k);
+  // il telefono rimette i campi omessi (app.js): stesso stato del server
+  assert.deepStrictEqual({ mt: null, ht: null, spArm: null, sts: [], ...pg }, S.physState(sim.fighters.get('b')));
+  castSp(a, 'dodge'); sim.step();
+  const pa = sim.snapshot('a').f.find((x) => x.id === 'a').ph;
+  assert.ok(Object.values(pa.mt).some((v) => v > 0));
+  for (const v of Object.values(pa.mt)) assert.ok(String(v).split('.')[1] === undefined || String(v).split('.')[1].length <= 3, String(v));
+  assert.deepStrictEqual(Object.keys(pa.sts[0]).sort(), ['jump', 'k', 'speed', 't']);
+});
+
+test('rientro: tenere Speciale durante il Turbine in aria non fa partire il Polverone', () => {
+  const f = S.newFighter(200, 500, 'pepe'); // fuori dall'isola, in aria
+  S.addMeter(f, 100);
+  S.stepFighter(f, { ...idle, sp: true, hb: 8 });
+  assert.strictEqual(f.att.ty, 'special');
+  hold(f, { hb: 8 }, 12);
+  assert.ok(!isSp(f));
+  assert.strictEqual(f.mt.special, S.CHARS.pepe.specials.special.charge);
+  // a terra, tenuto senza Turbine, la speciale parte come prima
+  const g = ground('pepe'); S.addMeter(g, 100);
+  hold(g, { hb: 8 }, 12);
+  assert.strictEqual(g.att.ty, 'sp:special');
 });

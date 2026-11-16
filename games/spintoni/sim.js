@@ -15,6 +15,10 @@ function roundPh(o) {
   if (o.att) { o.att.t = r3(o.att.t); o.att.c = r3(o.att.c || 0); }
   if (o.buf) o.buf.t = r3(o.buf.t);
   for (const s of o.sts) s.t = r3(s.t);
+  for (const k of ['mt', 'ht']) if (o[k]) for (const s in o[k]) o[k][s] = r3(o[k][s]);
+  // campi vuoti non mandati: il telefono li rimette prima di riapplicare gli input (vedi app.js)
+  for (const k of ['mt', 'ht', 'spArm']) if (o[k] === null) delete o[k];
+  if (!o.sts.length) delete o.sts;
   return o;
 }
 
@@ -208,8 +212,8 @@ class Sim {
     a.dealt += d;
     const pts = ((v.dmg - before) / S.PHYS.meterDmg) * ca.meter.hit; // barre dal danno realmente inflitto
     S.addMeter(a, pts);
-    S.addMeter(v, pts / 2);
-    if (debuff) v.sts.push({ k: 'd', t: debuff.dur, ...debuff });
+    S.addMeter(v, ((v.dmg - before) / S.PHYS.meterDmg) * S.CHARS[v.char].meter.hit / 2); // chi riceve: metà, con il suo meter.hit
+    if (debuff) S.addStatus(v, 'd', debuff);
     v.lastHitBy = a.id; v.lastHitAt = this.time;
     const kb = (((base + growth * v.dmg) * S.statOf(a, 'power')) / S.statOf(v, 'weight')) * (1 + 0.7 * p);
     if (armor || noLaunch) {
