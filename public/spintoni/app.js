@@ -149,7 +149,8 @@
         return `<button type="button" class="char" data-char="${id}" aria-pressed="false">
           <canvas data-portrait="${id}"></canvas><span class="cn">${esc(d.name)}</span>
           <span class="cd">${esc(d.desc)}</span><span class="stats">${statBars(d)}</span>
-          ${d.moves.special ? `<span class="spc"><strong>⚡ ${esc(d.moves.special.name)}</strong> ${esc(d.moves.special.desc || '')} <em>(ricarica ${d.moves.special.cooldown} s)</em></span>` : ''}</button>`;
+          ${d.moves.special ? `<span class="spc"><strong>⚡ ${esc(d.moves.special.name)}</strong> ${esc(d.moves.special.desc || '')} <em>(ricarica ${d.moves.special.cooldown} s)</em></span>` : ''}
+          ${d.specials ? Object.keys(SP_HOW).map((k) => `<span class="spc"><strong>★ ${esc(d.specials[k].name)}</strong> <em>(${SP_HOW[k]})</em> ${esc(d.specials[k].desc || '')}</span>`).join('') : ''}</button>`;
       }).join('');
       charsBuilt = true;
     }
@@ -196,6 +197,8 @@
     }
   }
 
+  // come si fa partire ogni speciale a barre (scheda del lottatore)
+  const SP_HOW = { light: 'Basico tenuto', heavy: 'Potenziato + giù tenuti', dodge: 'Schiva tenuta', special: 'Speciale tenuta', ultimate: 'suprema: 4 barre piene, I o pulsante SUPREMA' };
   $('chars').addEventListener('click', (e) => { const b = e.target.closest('[data-char]'); if (b) run('pick', { char: b.dataset.char }); });
   $('colors').addEventListener('click', (e) => {
     const b = e.target.closest('[data-color]');
@@ -218,8 +221,8 @@
 
     let snaps = [], clockOffset = null, last = null;
     let seq = 0, pending = [], pred = null, prevPred = null, lastTickAt = 0, meAlive = false;
-    const press = { j: false, l: false, h: false, s: false, d: false, dd: false };
-    let heavyBtn = false;           // pulsante Forte tenuto premuto (touch / mouse): serve per caricare il colpo
+    const press = { j: false, l: false, h: false, s: false, d: false, dd: false, ul: false };
+    const btnHeld = new Set();      // pulsanti touch / mouse tenuti premuti (data-act): Potenziato carica, tutti per le speciali a barre
     const keys = new Set();
     let stick = null;               // joystick sinistro
     let particles = [], rings = [], impacts = [], shake = 0, cardsKey = '';
@@ -260,7 +263,7 @@
       if (ws) { ws.onclose = null; try { ws.close(); } catch { /* ignora */ } ws = null; }
       clearInterval(sendTimer); clearInterval(cdTimer);
       cancelAnimationFrame(raf);
-      stick = null; heavyBtn = false;
+      stick = null; btnHeld.clear();
       for (const b of document.querySelectorAll('.pbtn.on')) b.classList.remove('on');
     }
     function connect() {
@@ -310,7 +313,7 @@
     function onEvent(ev) {
       if (ev.t === 'hit') {
         if (ev.arm) { burst(ev.x, ev.y, '#ffb74d', 10, 260); return; } // colpo assorbito dalla corazza
-        const heavy = ev.ty !== 'light';
+        const heavy = ev.ty !== 'light' && ev.ty !== 'sp:light';
         const ch = ev.ch || 0; // quanto era carico il colpo (0..1)
         const fx = fxOfId(ev.by); // le particelle sono del personaggio che colpisce
         burst(ev.x, ev.y, heavy ? '#ffeb3b' : '#ffffff', heavy ? 8 + Math.round(12 * ch) : 4, heavy ? 520 + 300 * ch : 320);
@@ -341,6 +344,9 @@
         impacts.push({ x: ev.x, y: ev.y, born: performance.now(), r: 70, color: '#80deea', life: 200 });
         rings.push({ x: ev.x, y: ev.y, born: performance.now(), r: 110 });
         shake = Math.max(shake, 10);
+      } else if (ev.t === 'shot') {
+        const fx = D.fxOf(String(ev.kind).split(':')[0]);
+        burst(ev.x, ev.y, fx.glow, 8, 320, fx.shape);
       } else if (ev.t === 'spawn') {
         burst(ev.x, ev.y, '#81d4fa', 14, 300);
       }
@@ -407,6 +413,7 @@
     }
 
     // ---------- input ----------
+    const HOLD = [['l', 'j', 'z'], ['h', 'k', 'x'], ['d', 'l', 'c', 'shift'], ['s', 'u', 'v']]; // [pulsante, tasti...] per bit
     function held() {
       let mx = 0, up = false, down = false;
       if (keys.has('a') || keys.has('arrowleft')) mx -= 1;
@@ -419,18 +426,21 @@
         if (dy < -28) up = true;
         if (dy > 28) down = true;
       }
-      // Forte tenuto premuto (tastiera o pulsante): carica il colpo, fino a 2 secondi
-      return { mx, up, down, hd: heavyBtn || keys.has('k') || keys.has('x') };
+      // tenuti premuti (bit 1 Basico, 2 Potenziato, 4 Schiva, 8 Speciale): servono per le speciali a barre
+      let hb = 0;
+      HOLD.forEach(([b, ...ks], i) => { if (btnHeld.has(b) || ks.some((k) => keys.has(k))) hb |= 1 << i; });
+      // Potenziato tenuto premuto (tastiera o pulsante): carica il colpo, fino a 2 secondi
+      return { mx, up, down, hd: !!(hb & 2), hb };
     }
 
     function sendInput() {
       if (!ws || ws.readyState !== 1) return;
       const h = held();
       // giù appena premuto: scende dalle piattaforme
-      const inp = { mx: h.mx, up: h.up, down: h.down, hd: h.hd, j: press.j, l: press.l, h: press.h, sp: press.s, d: press.d, dd: press.dd };
-      press.j = press.l = press.h = press.s = press.d = press.dd = false;
+      const inp = { mx: h.mx, up: h.up, down: h.down, hd: h.hd, hb: h.hb, ul: press.ul, j: press.j, l: press.l, h: press.h, sp: press.s, d: press.d, dd: press.dd };
+      press.j = press.l = press.h = press.s = press.d = press.dd = press.ul = false;
       seq += 1;
-      ws.send(JSON.stringify({ t: 'in', s: seq, mx: +inp.mx.toFixed(3), up: inp.up ? 1 : 0, dn: inp.down ? 1 : 0, j: inp.j ? 1 : 0, l: inp.l ? 1 : 0, h: inp.h ? 1 : 0, sp: inp.sp ? 1 : 0, hd: inp.hd ? 1 : 0, d: inp.d ? 1 : 0, dd: inp.dd ? 1 : 0 }));
+      ws.send(JSON.stringify({ t: 'in', s: seq, mx: +inp.mx.toFixed(3), up: inp.up ? 1 : 0, dn: inp.down ? 1 : 0, j: inp.j ? 1 : 0, l: inp.l ? 1 : 0, h: inp.h ? 1 : 0, sp: inp.sp ? 1 : 0, hd: inp.hd ? 1 : 0, d: inp.d ? 1 : 0, dd: inp.dd ? 1 : 0, ...(inp.hb ? { hb: inp.hb } : {}), ...(inp.ul ? { ul: 1 } : {}) }));
       if (pred && meAlive && !(last && last.raw.cd > 0)) {
         pending.push({ s: seq, inp });
         prevPred = { ...pred };
@@ -439,7 +449,7 @@
       lastTickAt = performance.now();
     }
 
-    const GAME_KEYS = ['w', 'a', 's', 'd', 'j', 'k', 'l', 'u', 'z', 'x', 'c', 'v', ' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+    const GAME_KEYS = ['w', 'a', 's', 'd', 'j', 'k', 'l', 'u', 'i', 'z', 'x', 'c', 'v', ' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
     window.addEventListener('keydown', (e) => {
       if (!active) return;
       const k = e.key.toLowerCase();
@@ -451,11 +461,12 @@
         if (k === 'k' || k === 'x') press.h = true;
         if (k === 'u' || k === 'v') press.s = true;
         if (k === 'l' || k === 'c' || k === 'shift') press.d = true;
+        if (k === 'i') press.ul = true;
       }
       keys.add(k);
     });
     window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
-    window.addEventListener('blur', () => { keys.clear(); heavyBtn = false; });
+    window.addEventListener('blur', () => { keys.clear(); btnHeld.clear(); });
 
     // joystick touch a sinistra, pulsanti a destra
     const game = $('screen-game');
@@ -482,8 +493,8 @@
     game.addEventListener('touchend', endTouch);
     game.addEventListener('touchcancel', endTouch);
     for (const b of document.querySelectorAll('.pbtn')) {
-      const on = (e) => { e.preventDefault(); e.stopPropagation(); press[b.dataset.act] = true; if (b.dataset.act === 'h') heavyBtn = true; b.classList.add('on'); if (navigator.vibrate) navigator.vibrate(8); };
-      const off = (e) => { e.preventDefault(); if (b.dataset.act === 'h') heavyBtn = false; b.classList.remove('on'); };
+      const on = (e) => { e.preventDefault(); e.stopPropagation(); press[b.dataset.act] = true; btnHeld.add(b.dataset.act); b.classList.add('on'); if (navigator.vibrate) navigator.vibrate(8); };
+      const off = (e) => { e.preventDefault(); btnHeld.delete(b.dataset.act); b.classList.remove('on'); };
       b.addEventListener('touchstart', on, { passive: false });
       b.addEventListener('touchend', off);
       b.addEventListener('touchcancel', off);
@@ -494,13 +505,25 @@
 
     // ---------- disegno ----------
     // ricarica della speciale: pulsante sul telefono e indicatore sul computer
+    // barre delle speciali (solo i personaggi che le hanno): anello sui pulsanti, pulsante suprema, barrette sul computer
+    const SLOT_KEY = { light: 'J', heavy: 'K+S', dodge: 'L', special: 'U' };
     let spKey = '';
     function updateSpecial() {
       const sp = pred && S.CHARS[pred.char] && S.CHARS[pred.char].moves.special;
+      const sps = pred && pred.mt && S.CHARS[pred.char] && S.CHARS[pred.char].specials;
+      const fr = sps ? S.SLOTS.map((k) => Math.min(1, pred.mt[k] / sps[k].charge)) : null;
+      const ult = !!fr && fr.every((v) => v >= 1);
       const cd = sp ? pred.spCd || 0 : 0;
-      const key = sp ? `${sp.name}:${cd > 0 ? Math.ceil(cd * 10) : 'ok'}` : '';
+      const key = (sp ? `${sp.name}:${cd > 0 ? Math.ceil(cd * 10) : 'ok'}` : '') + (fr ? fr.map((v) => Math.floor(v * 20)).join(',') : '');
       if (key === spKey) return;
       spKey = key;
+      S.SLOTS.forEach((k, i) => {
+        const b = document.querySelector('.pbtn.' + k);
+        b.classList.toggle('mt', !!fr);
+        b.classList.toggle('full', !!fr && fr[i] >= 1);
+        if (fr) b.style.setProperty('--m', fr[i].toFixed(3));
+      });
+      document.querySelector('.pbtn.ult').hidden = !ult;
       const btn = document.querySelector('.pbtn.special');
       const ind = $('sp-ind');
       if (!sp) { ind.hidden = true; return; }
@@ -510,7 +533,9 @@
       btn.dataset.cd = cd > 0 ? (cd >= 1 ? String(Math.ceil(cd)) : cd.toFixed(1)) : '';
       ind.hidden = false;
       ind.classList.toggle('ready', cd <= 0);
-      ind.textContent = cd > 0 ? `⚡ ${sp.name}: ${cd.toFixed(1)} s` : `⚡ ${sp.name} pronta (U)`;
+      ind.innerHTML = esc(cd > 0 ? `⚡ ${sp.name}: ${cd.toFixed(1)} s` : `⚡ ${sp.name} pronta (U)`)
+        + (fr ? fr.map((v, i) => `<span class="mb${v >= 1 ? ' full' : ''}" style="--m:${v.toFixed(2)}">${SLOT_KEY[S.SLOTS[i]]}</span>`).join('') : '')
+        + (ult ? '<span class="mb ul">I · SUPREMA!</span>' : '');
     }
 
     function displayedMe() {
@@ -521,7 +546,7 @@
 
     // gli altri: interpolati tra due snapshot, un invio e mezzo nel passato (margine per i ritardi di rete)
     function others() {
-      if (!snaps.length) return [];
+      if (!snaps.length) return { list: [], shots: [] };
       const renderK = (performance.now() - clockOffset) / (S.TICK * 1000) - S.SEND_EVERY * 1.5;
       let a = snaps[0], b = snaps[snaps.length - 1];
       for (let i = snaps.length - 1; i > 0; i--) {
@@ -536,7 +561,14 @@
         if (f0 && f0.al === f1.al && Math.hypot(f1.x - f0.x, f1.y - f0.y) < 300) out.push({ ...f1, x: f0.x + (f1.x - f0.x) * t, y: f0.y + (f1.y - f0.y) * t });
         else out.push(f1);
       }
-      return out;
+      // proiettili: come gli avversari, solo quelli presenti in entrambi gli snapshot
+      const pa = new Map((a.raw.p || []).map((p) => [p[0], p]));
+      const shots = [];
+      for (const [id, kind, x, y, face] of b.raw.p || []) {
+        const p0 = pa.get(id);
+        if (p0) shots.push([id, kind, p0[2] + (x - p0[2]) * t, p0[3] + (y - p0[3]) * t, face]);
+      }
+      return { list: out, shots };
     }
 
     let lastFrame = 0;
@@ -561,7 +593,7 @@
       if (!scene.mapReady && D.mapReady()) scene = D.makeScene(); // le immagini della mappa sono arrivate dopo
       ctx.drawImage(scene.canvas, scene.ox, scene.oy);
 
-      const list = others();
+      const { list, shots } = others();
       const meNow = displayedMe();
       for (const f of list) {
         if (!f.al) continue;
@@ -576,9 +608,11 @@
         if (wg !== undefined && wg !== !!st.g) dust(st.x, st.y, st.g ? 8 : 5);
         wasGround.set(f.id, !!st.g);
         const fl = Math.max(0, ((flashUntil.get(f.id) || 0) - now) / 140);
+        if (st.bf) D.statusAura(ctx, st.x, st.y, st.bf, now, f.c);
         D.fighter(ctx, st.x, st.y, st, f.sl, now, { name: f.id === R.you ? 'Tu' : nameOf(f.id), color: colorOf(f.id), flash: fl });
       }
 
+      for (const p of shots) D.projectile(ctx, p[1], p[2], p[3], p[4], now);
       for (const r of rings) {
         const t = (now - r.born) / (r.ko ? 600 : 260);
         if (t > 1) continue;
