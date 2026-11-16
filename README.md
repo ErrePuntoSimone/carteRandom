@@ -90,6 +90,9 @@ un'isola galleggiante e tre piattaforme sospese. Lo scopo è buttare fuori dallo
 - **Attacchi:** *pugno* veloce e *forte* lento ma potente, in avanti, verso l'alto o verso il basso (tenendo su o giù).
   In più un salto da terra e uno in aria, la discesa dalle piattaforme e la *schivata* che rende intoccabili per un attimo.
 - **Lottatori originali:** *Pepe* (leggero e veloce), *Gilda* (equilibrata) e *Tonno* (pesante e potente).
+- **Colore dei dettagli:** nella sala d'attesa ognuno sceglie un colore (o i colori originali) che si applica a pochi
+  dettagli del personaggio: polsini dei guantoni, strisce delle scarpe, fibbia, e la bandana di Pepe, la stella e il
+  fermacoda di Gilda, la fascia sulla canottiera di Tonno. I bot ne prendono uno a caso.
 - **Controlli:** sul telefono in orizzontale joystick a sinistra e pulsanti Salta, Pugno, Forte, Schiva a destra;
   sul computer A/D o frecce, W/↑/spazio per saltare, S/↓ giù, J pugno, K forte, L o Maiusc schiva.
 - **Rete:** come Rissa, il server simula a 30 passi al secondo e decide i colpi; il telefono prevede la propria fisica
@@ -105,6 +108,9 @@ Se le immagini mancano, il gioco usa il disegno a codice (`public/spintoni/draw.
 - **Rigenerarle:** `node tools/bake-spintoni.js` le disegna con `tools/sprites/hd-render.js` (scheletro con gomiti e
   ginocchia calcolati, contorni e ombreggiatura) e le esporta. Serve Playwright; con Pillow i PNG vengono anche ridotti
   (circa 180 KB l'uno).
+- **Dettagli colorabili:** accanto a ogni sprite c'è `<personaggio>-mask.png`, con solo i dettagli colorabili in scala
+  di grigi (già tagliati dove li coprono braccia o corpo). Il gioco la moltiplica per il colore scelto e la disegna sopra
+  il fotogramma, così le ombre restano. Nel disegnatore le zone colorabili sono segnate con `ctx.__acc`.
 - **Cambiare la grafica:** basta sostituire un `.png` mantenendo lo stesso schema (cella, punto d'appoggio, ordine e
   numero dei fotogrammi del `.json`). Il test `test/spintoni-sprites.test.js` controlla che lo schema sia rispettato.
 - **Temporizzazione:** i pugni hanno tre fasi (carica, colpo, recupero) che seguono i tempi del gioco, così il fotogramma

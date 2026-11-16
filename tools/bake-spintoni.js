@@ -5,8 +5,9 @@
 //
 // Richiede Playwright (solo per generare le immagini, il gioco non ne ha bisogno) e, se presente,
 // Python con Pillow per ridurre il peso dei PNG. Scrive in public/spintoni/sprites/:
-//   <personaggio>.png  - tutti i fotogrammi in una griglia
-//   <personaggio>.json - descrizione: dimensioni, punto d'appoggio dei piedi e animazioni
+//   <personaggio>.png      - tutti i fotogrammi in una griglia
+//   <personaggio>-mask.png - stessa griglia, solo i dettagli colorabili in scala di grigi
+//   <personaggio>.json     - descrizione: dimensioni, punto d'appoggio dei piedi e animazioni
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
@@ -34,8 +35,8 @@ async function main() {
   await page.setContent('<canvas id="c"></canvas>');
   await page.addScriptTag({ content: SCRIPT });
 
-  for (const ch of CHARS) {
-    const result = await page.evaluate(({ ch, ORDER, SCALE, CELL_U, ANCHOR_U, COLS }) => {
+  for (const ch of CHARS) for (const mode of ['full', 'mask']) {
+    const result = await page.evaluate(({ ch, mode, ORDER, SCALE, CELL_U, ANCHOR_U, COLS }) => {
       const cw = Math.round(CELL_U.w * SCALE), chh = Math.round(CELL_U.h * SCALE);
       const ax = Math.round(ANCHOR_U.x * SCALE), ay = Math.round(ANCHOR_U.y * SCALE);
       const total = ORDER.reduce((s, n) => s + HD.ANIMS[n].frames, 0);
@@ -57,20 +58,20 @@ async function main() {
           ctx.beginPath(); ctx.rect(col * cw, row * chh, cw, chh); ctx.clip();
           ctx.translate(col * cw + ax, row * chh + ay);
           ctx.scale(SCALE, SCALE);
-          HD.draw(ctx, ch, a.fn(i, a.frames), i / a.frames);
+          HD.draw(ctx, ch, a.fn(i, a.frames), i / a.frames, mode);
           ctx.restore();
         }
       }
       return {
         png: c.toDataURL('image/png').split(',')[1],
-        meta: { char: ch, scale: SCALE, cell: { w: cw, h: chh }, anchor: { x: ax, y: ay }, cols: COLS, frames: total, anims },
+        meta: { char: ch, scale: SCALE, cell: { w: cw, h: chh }, anchor: { x: ax, y: ay }, cols: COLS, frames: total, mask: `${ch}-mask.png`, anims },
       };
-    }, { ch, ORDER, SCALE, CELL_U, ANCHOR_U, COLS });
+    }, { ch, mode, ORDER, SCALE, CELL_U, ANCHOR_U, COLS });
 
-    const png = path.join(OUT, `${ch}.png`);
+    const png = path.join(OUT, mode === 'mask' ? `${ch}-mask.png` : `${ch}.png`);
     fs.writeFileSync(png, Buffer.from(result.png, 'base64'));
-    fs.writeFileSync(path.join(OUT, `${ch}.json`), JSON.stringify(result.meta));
-    console.log(`${ch}: ${result.meta.frames} fotogrammi, ${(fs.statSync(png).size / 1024).toFixed(0)} KB`);
+    if (mode === 'full') fs.writeFileSync(path.join(OUT, `${ch}.json`), JSON.stringify(result.meta));
+    console.log(`${path.basename(png)}: ${result.meta.frames} fotogrammi, ${(fs.statSync(png).size / 1024).toFixed(0)} KB`);
   }
   await browser.close();
 
@@ -84,8 +85,9 @@ for p in sys.argv[1:]:
     q = im.quantize(colors=256, method=Image.Quantize.FASTOCTREE, dither=Image.Dither.NONE)
     q.save(p, optimize=True)
 `;
-    execFileSync('python3', ['-c', py, ...CHARS.map((c) => path.join(OUT, `${c}.png`))], { stdio: 'inherit' });
-    for (const ch of CHARS) console.log(`${ch}: ottimizzato, ${(fs.statSync(path.join(OUT, `${ch}.png`)).size / 1024).toFixed(0)} KB`);
+    const files = CHARS.flatMap((c) => [`${c}.png`, `${c}-mask.png`]).map((f) => path.join(OUT, f));
+    execFileSync('python3', ['-c', py, ...files], { stdio: 'inherit' });
+    for (const f of files) console.log(`${path.basename(f)}: ottimizzato, ${(fs.statSync(f).size / 1024).toFixed(0)} KB`);
   } catch (err) {
     console.log('Pillow non disponibile: PNG lasciati non ottimizzati.');
   }

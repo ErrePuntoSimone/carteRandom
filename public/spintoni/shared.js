@@ -207,7 +207,23 @@
 
   const outOfBounds = (f) => f.x < STAGE.blast.l || f.x > STAGE.blast.r || f.y > STAGE.blast.b || f.y < STAGE.blast.t;
 
-  const api = { TICK, STAGE, PHYS, CHARS, MOVES, newFighter, physState, stepFighter, hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds };
+  // Colori per i dettagli del personaggio (bandana, polsini, scarpe...). null = colori originali.
+  const COLORS = [
+    { id: 'rosso', name: 'Rosso', hex: '#e53935' },
+    { id: 'arancio', name: 'Arancio', hex: '#fb8c00' },
+    { id: 'giallo', name: 'Giallo', hex: '#fdd835' },
+    { id: 'verde', name: 'Verde', hex: '#43a047' },
+    { id: 'acqua', name: 'Acqua', hex: '#26c6da' },
+    { id: 'azzurro', name: 'Azzurro', hex: '#42a5f5' },
+    { id: 'blu', name: 'Blu', hex: '#3949ab' },
+    { id: 'viola', name: 'Viola', hex: '#8e24aa' },
+    { id: 'rosa', name: 'Rosa', hex: '#ec407a' },
+    { id: 'bianco', name: 'Bianco', hex: '#f5f5f5' },
+    { id: 'nero', name: 'Nero', hex: '#424242' },
+  ];
+  const colorHex = (id) => (COLORS.find((c) => c.id === id) || {}).hex || null;
+
+  const api = { TICK, STAGE, PHYS, CHARS, MOVES, COLORS, colorHex, newFighter, physState, stepFighter, hitbox, hurtbox, overlap, isActive, moveTotal, outOfBounds };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.SpintoniShared = api;
 })(typeof self !== 'undefined' ? self : this);

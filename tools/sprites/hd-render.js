@@ -16,17 +16,17 @@ window.HD = (() => {
   const STYLES = {
     pepe: {
       skin: '#eab18a', skinD: '#c98a63', top: '#ff7043', topD: '#cf4a1f', bot: '#27406f', botD: '#1a2b4f',
-      shoe: '#f7f7f7', shoeD: '#bfbfbf', accent: '#e53935', hair: '#2a1b16',
+      shoe: '#f7f7f7', shoeD: '#bfbfbf', accent: '#e53935', accentD: '#a01c1c', hair: '#2a1b16',
       sw: 30, ww: 24, limb: 9.5, head: 15, arm: [18, 17], leg: [17.5, 17.5], glove: 12.5, shorts: true,
     },
     gilda: {
       skin: '#f2c9a0', skinD: '#d3a276', top: '#ab47bc', topD: '#7b2f8a', bot: '#2c2340', botD: '#1c162b',
-      shoe: '#ffc107', shoeD: '#c79100', accent: '#ffd740', hair: '#5b1a8b',
+      shoe: '#ffc107', shoeD: '#c79100', accent: '#ffd740', accentD: '#c7a500', hair: '#5b1a8b',
       sw: 31, ww: 23, limb: 9, head: 15, arm: [18, 17], leg: [17.5, 17.5], glove: 12.5, shorts: false,
     },
     tonno: {
       skin: '#e3ae86', skinD: '#c08560', top: '#42a5f5', topD: '#2b7bc0', bot: '#38474f', botD: '#252f35',
-      shoe: '#6d4c41', shoeD: '#4a3229', accent: '#fff59d', hair: '#4e342e',
+      shoe: '#6d4c41', shoeD: '#4a3229', accent: '#ffca28', accentD: '#c79100', hair: '#4e342e',
       sw: 46, ww: 38, limb: 12.5, head: 17, arm: [19, 18], leg: [17.5, 17.5], glove: 15, shorts: false,
     },
   };
@@ -111,12 +111,14 @@ window.HD = (() => {
   }
 
   function glove(ctx, hand, fore, r) {
-    // polsino bianco verso l'avambraccio
+    // polsino verso l'avambraccio (dettaglio colorabile, bianco di base)
     const dir = Math.atan2(fore.y - hand.y, fore.x - hand.x);
     const cuff = { x: hand.x + Math.cos(dir) * r * 0.95, y: hand.y + Math.sin(dir) * r * 0.95 };
     ctx.save();
     ctx.translate(cuff.x, cuff.y); ctx.rotate(dir);
+    ctx.__acc = '#fafafa';
     shaded(ctx, roundRectPath(ctx, -r * 0.35, -r * 0.7, r * 0.8, r * 1.4, 3), '#fafafa', '#c9c9c9', 1.5);
+    ctx.__acc = null;
     ctx.restore();
     shaded(ctx, ellipsePath(ctx, hand.x, hand.y, r, r * 0.95), '#e53935', '#a01c1c', r * 0.28);
     // pollice e riflesso
@@ -132,7 +134,7 @@ window.HD = (() => {
     shaded(c, roundRectPath(c, -6, -8.5, 20, 11, 5), st.shoe, st.shoeD, 2);
     // suola e dettaglio
     c.fillStyle = OUT; c.fillRect(-5, 1.2, 18, 2.6);
-    c.fillStyle = st.accent; c.fillRect(-1, -6.4, 8, 2.4);
+    c.__acc = st.accent; c.fillStyle = st.accent; c.fillRect(-1, -6.4, 8, 2.4); c.__acc = null;
     c.restore();
     if (front) { /* nessun dettaglio extra */ }
   }
@@ -218,12 +220,14 @@ window.HD = (() => {
       const droop = 0.5 + p.wind * 0.6;
       for (const [len, a0] of [[26, -0.1], [20, 0.35]]) {
         const a = Math.PI + a0 - droop * 0.35 + wob * 0.3;
+        ctx.__acc = st.accent;
         ctx.fillStyle = st.accent; ctx.strokeStyle = OUT; ctx.lineWidth = 2.4; ctx.lineJoin = 'round';
         ctx.beginPath();
         ctx.moveTo(-r * 0.6, -r * 0.4);
         ctx.quadraticCurveTo(-r - len * 0.5, -r * 0.5 + Math.sin(a) * len * 0.5 + 4, -r + Math.cos(a) * len, -r * 0.4 + Math.sin(a) * len + 5);
         ctx.quadraticCurveTo(-r - len * 0.3, -r * 0.1 + 6, -r * 0.55, -r * 0.05);
         ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.__acc = null;
       }
     } else if (id === 'gilda') {
       // coda di cavallo
@@ -234,7 +238,9 @@ window.HD = (() => {
       ctx.bezierCurveTo(-r - 14, -r - 2 + swing * 6, -r - 26, 2 + swing * 16, -r - 20 - swing * 6, 12 + swing * 12);
       ctx.bezierCurveTo(-r - 10, 4 + swing * 6, -r - 4, 0, -r * 0.6, -r * 0.05);
       ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.__acc = st.accent;
       ctx.fillStyle = st.accent; ctx.beginPath(); ctx.arc(-r * 0.78, -r * 0.5, 3.2, 0, TAU); ctx.fill(); ctx.stroke();
+      ctx.__acc = null;
     }
     // testa
     const wide = id === 'tonno' ? 1.1 : 1;
@@ -258,8 +264,10 @@ window.HD = (() => {
       ctx.lineTo(r * 0.7, -r * 0.28); ctx.lineTo(-r * 0.2, -r * 0.36); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.save();
       ctx.beginPath(); ctx.ellipse(0, 0, r * 1.02, r * 1.02, 0, 0, TAU); ctx.clip();
+      ctx.__acc = st.accent;
       ctx.fillStyle = st.accent; ctx.fillRect(-r - 2, -r * 0.62, r * 2 + 4, 6.4);
       ctx.fillStyle = 'rgba(0,0,0,.2)'; ctx.fillRect(-r - 2, -r * 0.62 + 4.2, r * 2 + 4, 2.2);
+      ctx.__acc = null;
       ctx.restore();
       ctx.strokeStyle = OUT; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(-r - 1, -r * 0.62); ctx.lineTo(r + 1, -r * 0.62); ctx.moveTo(-r - 1, -r * 0.62 + 6.4); ctx.lineTo(r + 1, -r * 0.62 + 6.4); ctx.stroke();
@@ -313,6 +321,7 @@ window.HD = (() => {
       // giacca aperta con maglia scura e stella
       ctx.fillStyle = '#d1c4e9'; ctx.fillRect(-4, -34, 11, 40);
       ctx.fillStyle = st.topD; ctx.fillRect(-4.4, -34, 1.6, 40); ctx.fillRect(6.4, -34, 1.6, 40);
+      ctx.__acc = st.accent;
       ctx.fillStyle = st.accent;
       for (let i = 0; i < 10; i++) {
         const a = -Math.PI / 2 + (i * Math.PI) / 5, rr = i % 2 ? 2.6 : 6;
@@ -320,24 +329,86 @@ window.HD = (() => {
         if (i) ctx.lineTo(px, py); else { ctx.beginPath(); ctx.moveTo(px, py); }
       }
       ctx.closePath(); ctx.fill();
+      ctx.__acc = null;
     } else {
-      // canottiera con pettorale e peli
+      // canottiera con pettorale, fascia colorata e peli
       ctx.fillStyle = 'rgba(255,255,255,.22)'; ctx.beginPath(); ctx.ellipse(4, -17, 14, 11, 0, 0, TAU); ctx.fill();
       ctx.fillStyle = st.skin; ctx.beginPath(); ctx.moveTo(-9, -34); ctx.quadraticCurveTo(2, -20, 13, -34); ctx.fill();
+      ctx.__acc = st.accent;
+      ctx.fillStyle = st.accent; ctx.fillRect(-sw, -13, sw * 2, 5);
+      ctx.fillStyle = 'rgba(0,0,0,.22)'; ctx.fillRect(-sw, -9.4, sw * 2, 1.4);
+      ctx.__acc = null;
       ctx.strokeStyle = 'rgba(78,52,46,.55)'; ctx.lineWidth = 1.4;
       for (let i = -1; i <= 1; i++) { ctx.beginPath(); ctx.moveTo(2 + i * 4, -30); ctx.lineTo(3 + i * 4, -26); ctx.stroke(); }
     }
     // cintura
     ctx.fillStyle = st.bot; ctx.fillRect(-sw, -3, sw * 2, 10);
     ctx.fillStyle = 'rgba(0,0,0,.25)'; ctx.fillRect(-sw, 3, sw * 2, 4);
-    ctx.fillStyle = id === 'pepe' ? st.accent : '#ffd740'; ctx.fillRect(-4, -3, 9, 6);
+    ctx.__acc = st.accent; ctx.fillStyle = st.accent; ctx.fillRect(-4, -3, 9, 6); ctx.__acc = null;
     ctx.restore();
     shape(); ctx.strokeStyle = OUT; ctx.lineWidth = LW; ctx.stroke();
     ctx.restore();
   }
 
+  // ---------- maschera dei dettagli colorabili ----------
+  // In modalità maschera tutto ciò che non è un dettaglio colorabile cancella (così i dettagli coperti
+  // da braccia o corpo spariscono), mentre i dettagli si disegnano in scala di grigi: bianco = colore pieno,
+  // grigio = ombra. Il gioco poi moltiplica la maschera per il colore scelto.
+  const lum = (r, g, b) => 0.299 * r + 0.587 * g + 0.114 * b;
+  function parseColor(c) {
+    if (typeof c !== 'string') return null;
+    if (c[0] === '#') {
+      const n = parseInt(c.slice(1, 7), 16);
+      return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255, a: 1 };
+    }
+    const m = c.match(/rgba?\(([^)]+)\)/);
+    if (!m) return null;
+    const [r, g, b, a = 1] = m[1].split(',').map((x) => parseFloat(x));
+    return { r, g, b, a };
+  }
+  function maskCtx(real) {
+    let acc = null; // colore base della zona colorabile in corso, o null
+    const toGrey = (style) => {
+      const c = parseColor(style);
+      const base = parseColor(acc);
+      if (!c || !base) return '#ffffff';
+      const v = Math.max(0, Math.min(1, lum(c.r, c.g, c.b) / Math.max(1, lum(base.r, base.g, base.b))));
+      const k = Math.round(v * 255);
+      return `rgba(${k},${k},${k},${c.a})`;
+    };
+    const isOutline = (style) => typeof style === 'string' && style.toLowerCase() === OUT;
+    function paint(method, styleProp, args) {
+      const op = real.globalCompositeOperation, style = real[styleProp];
+      if (acc && !isOutline(style)) {
+        real.globalCompositeOperation = 'source-over';
+        real[styleProp] = toGrey(style);
+      } else {
+        real.globalCompositeOperation = 'destination-out';
+      }
+      real[method](...args);
+      real.globalCompositeOperation = op;
+      real[styleProp] = style;
+    }
+    return new Proxy(real, {
+      get(t, prop) {
+        if (prop === '__acc') return acc;
+        if (prop === 'fill' || prop === 'fillRect') return (...a) => paint(prop, 'fillStyle', a);
+        if (prop === 'stroke' || prop === 'strokeRect') return (...a) => paint(prop, 'strokeStyle', a);
+        const v = t[prop];
+        return typeof v === 'function' ? v.bind(t) : v;
+      },
+      set(t, prop, val) {
+        if (prop === '__acc') acc = val;
+        else t[prop] = val;
+        return true;
+      },
+    });
+  }
+
   // ---------- figura completa ----------
-  function draw(ctx, id, p, t = 0) {
+  // mode: 'full' (immagine normale) oppure 'mask' (solo i dettagli colorabili)
+  function draw(ctx, id, p, t = 0, mode = 'full') {
+    if (mode === 'mask') ctx = maskCtx(ctx);
     const st = STYLES[id];
     const hip = { x: p.bx, y: -34 + p.by };
     const R = (v) => add(hip, rot(v, p.lean));
