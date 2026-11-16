@@ -26,3 +26,45 @@ window.Player = (() => {
   }
   return { getName, setName, logout, loginUrl, require, clean };
 })();
+
+// Stanza pubblica: interruttore per chi ha creato la stanza (la rende visibile nel menu).
+window.PublicRoom = (() => {
+  let row = null, input = null, text = null, busy = false;
+  function build(game, getSession) {
+    const head = document.querySelector('.room-head:not([hidden])') || document.querySelector('.room-head');
+    if (!head) return false;
+    row = document.createElement('label');
+    row.className = 'toggle public-row';
+    row.innerHTML = '<input type="checkbox"><span></span>';
+    input = row.querySelector('input');
+    text = row.querySelector('span');
+    head.insertAdjacentElement('afterend', row);
+    input.addEventListener('change', async () => {
+      const s = getSession();
+      if (!s || busy) return;
+      busy = true;
+      try {
+        const res = await fetch(`/api/${game}/rooms/${s.code}/visibility`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: s.playerId, token: s.token, public: input.checked }),
+        });
+        if (!res.ok) input.checked = !input.checked;
+      } catch { input.checked = !input.checked; }
+      busy = false;
+    });
+    return true;
+  }
+  // da chiamare a ogni aggiornamento dello stato della stanza
+  function update(game, state, session) {
+    if (!row && !build(game, () => session)) return;
+    const host = state.hostId === state.you;
+    row.hidden = !host && !state.public;
+    input.hidden = !host;
+    input.disabled = !host;
+    input.checked = !!state.public;
+    text.textContent = host
+      ? '🌐 Stanza pubblica: visibile nel menu a tutti'
+      : '🌐 Stanza pubblica';
+  }
+  return { update };
+})();

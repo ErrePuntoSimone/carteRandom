@@ -23,6 +23,14 @@
     .game p { margin: 0; color: var(--muted); font-size: .92rem; }
     .game .go { margin-left: auto; color: var(--accent); font-size: 1.4rem; flex: none; }
     .who strong { font-size: 1.1rem; }
+    .open-rooms h2 { margin: 0 0 10px; }
+    .open-room { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--panel-border); color: var(--text); text-decoration: none; }
+    .open-room:first-of-type { border-top: 0; }
+    .open-room .oi { font-size: 1.6rem; width: 36px; text-align: center; flex: none; }
+    .open-room .ot { min-width: 0; flex: 1; }
+    .open-room .ot strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .open-room .ot span { color: var(--muted); font-size: .85rem; }
+    .open-room .btn { flex: none; }
     .tag-mp { font-size: .72rem; font-weight: 600; color: var(--accent-text); background: var(--accent); padding: 1px 7px; border-radius: 999px; }
   </style>
 </head>
@@ -48,6 +56,11 @@
       <span>Ciao, <strong id="who-name"></strong> 👋</span>
       <button id="btn-change" class="linkish" type="button">Cambia nome</button>
     </div>
+
+    <section id="open-rooms" class="panel open-rooms" hidden>
+      <h2>Partite aperte <span class="pill" id="open-count"></span></h2>
+      <div id="open-list"></div>
+    </section>
 
     <nav class="games" id="games" aria-label="Minigiochi" hidden>
       <a class="game" href="/carte/">
@@ -115,6 +128,7 @@
         $('who').hidden = !logged;
         $('games').hidden = !logged;
         $('hero-sub').textContent = logged ? 'Scegli a cosa giocare.' : 'Inserisci il tuo nome per iniziare.';
+        if (!logged) $('open-rooms').hidden = true;
         if (logged) $('who-name').textContent = name;
         else { $('input-name').value = name; $('input-name').focus(); $('input-name').select(); }
       }
@@ -128,6 +142,34 @@
         history.replaceState(null, '', '/');
         render(false);
       });
+      // partite pubbliche a cui ci si può unire senza codice
+      const GAMES = [
+        ['carte', '🃏', 'Carte Random'], ['poker', '♠️', 'Poker'], ['briscola', '🏆', 'Briscola'],
+        ['arena', '💥', 'Rissa'], ['spintoni', '🥊', 'Spintoni'],
+      ];
+      const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+      async function loadOpen() {
+        if (!Player.getName() || document.hidden) return;
+        const lists = await Promise.all(GAMES.map(async ([id, icon, title]) => {
+          try {
+            const res = await fetch(`/api/${id}/rooms`, { cache: 'no-store' });
+            return res.ok ? (await res.json()).map((r) => ({ ...r, id, icon, title })) : [];
+          } catch { return []; }
+        }));
+        const all = lists.flat();
+        $('open-rooms').hidden = !all.length || $('games').hidden;
+        $('open-count').textContent = all.length;
+        $('open-list').innerHTML = all.map((r) => `
+          <a class="open-room" href="/${r.id}/r/${esc(r.code)}">
+            <span class="oi">${r.icon}</span>
+            <span class="ot"><strong>${esc(r.title)} di ${esc(r.host)}</strong><span>${r.players}/${r.max} giocatori${r.label ? ' · ' + esc(r.label) : ''}</span></span>
+            <span class="btn small primary">Entra</span>
+          </a>`).join('');
+      }
+      loadOpen();
+      setInterval(loadOpen, 5000);
+      document.addEventListener('visibilitychange', loadOpen);
+
       $('btn-change').addEventListener('click', () => render(true));
 
       render(params.has('cambia'));

@@ -109,6 +109,7 @@
   const inHand = () => S.table.phase === 'betting' || S.table.phase === 'showdown';
 
   function render(state) {
+    if (session) PublicRoom.update('poker', state, session);
     S = state;
     const t = S.table;
     if (!inHand()) actingFor = null;

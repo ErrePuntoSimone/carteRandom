@@ -102,6 +102,7 @@
   };
 
   function render(state) {
+    if (session) PublicRoom.update('arena', state, session);
     S = state;
     const g = S.game;
     if (g.phase === 'playing') {
