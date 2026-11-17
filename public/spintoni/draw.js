@@ -397,26 +397,42 @@ window.SpintoniDraw = (() => {
   }
 
   const waiting = [];
-  function portrait(canvas, char, color = null) {
+  // zoom > 1 inquadra solo la parte alta (busto e testa), come le icone della griglia di scelta
+  function portrait(canvas, char, color = null, zoom = 1) {
     const dpr = window.devicePixelRatio || 1;
     const w = canvas.clientWidth || 70, h = canvas.clientHeight || 84;
     canvas.width = w * dpr; canvas.height = h * dpr;
     const ctx = canvas.getContext('2d');
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, w, h);
-    const s = h / 110;
-    ctx.translate(w / 2 - 4 * s, h - 6 * s);
+    const s = (h / 110) * zoom;
+    ctx.translate(w / 2 - 4 * s, h - 6 * s + (zoom - 1) * h * 0.62);
     ctx.scale(s, s);
     const spr = window.SpintoniSprites && window.SpintoniSprites.get(char);
     // si ridisegna quando arrivano le immagini (e la maschera, se serve un colore)
-    if ((!spr || (color && !spr.mask)) && window.SpintoniSprites && !waiting.some((q) => q.canvas === canvas)) waiting.push({ canvas, char, color });
+    if ((!spr || (color && !spr.mask)) && window.SpintoniSprites && !waiting.some((q) => q.canvas === canvas)) waiting.push({ canvas, char, color, zoom });
     fighter(ctx, 0, 0, { c: char, fc: 1, g: false, vx: 0, vy: 0, x: 0, a: null, hs: 0, dg: 0 }, 0, 0, { noTag: true, color });
   }
+  // Lottatore grande e animato (fermo che respira) per la vetrina della scelta del personaggio.
+  function hero(canvas, char, color, now) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    if (!w || !h) return;
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr); }
+    const ctx = canvas.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    const s = h / 120;
+    ctx.translate(w / 2 - 4 * s, h - 4 * s);
+    ctx.scale(s, s);
+    fighter(ctx, 0, 0, { c: char, fc: 1, g: true, vx: 0, vy: 0, x: 0, a: null, hs: 0, dg: 0 }, 0, now, { noTag: true, color });
+  }
+
   // appena le immagini sono caricate si ridisegnano i ritratti già mostrati
   if (window.SpintoniSprites) {
     window.SpintoniSprites.onLoad((id) => {
       for (let i = waiting.length - 1; i >= 0; i--) {
-        if (waiting[i].char === id) { const q = waiting.splice(i, 1)[0]; portrait(q.canvas, id, q.color); }
+        if (waiting[i].char === id) { const q = waiting.splice(i, 1)[0]; portrait(q.canvas, id, q.color, q.zoom); }
       }
     });
   }
@@ -429,5 +445,5 @@ window.SpintoniDraw = (() => {
     return '#e53935';
   }
 
-  return { sky, makeScene, mapReady: () => map.ready, paint: { scenery: paintScenery, island: paintIsland, platform: paintPlatform }, SCENE, fighter, portrait, dmgColor, SLOT_COLORS };
+  return { sky, makeScene, mapReady: () => map.ready, paint: { scenery: paintScenery, island: paintIsland, platform: paintPlatform }, SCENE, fighter, portrait, hero, dmgColor, SLOT_COLORS };
 })();
