@@ -134,6 +134,29 @@
     return rows.map(([l, v]) => `<div class="stat">${l}<span class="bar"><span style="width:${Math.round(v * 100)}%"></span></span></div>`).join('');
   }
 
+  // vetrina del lottatore scelto: scheda e figura grande animata
+  let shown = null;
+  function renderShowcase(id, color) {
+    const d = S.CHARS[id] || S.CHARS[CHAR_IDS[0]];
+    hero.char = id; hero.color = S.colorHex(color);
+    if (shown === id) return;
+    shown = id;
+    $('hero-name').textContent = d.name;
+    $('hero-desc').textContent = d.desc;
+    $('hero-stats').innerHTML = statBars(d);
+    const sp = d.moves.special;
+    $('hero-sp').innerHTML = (sp ? `<strong>⚡ ${esc(sp.name)}</strong> <em>ricarica ${sp.cooldown} s</em><br>${esc(sp.desc || '')}` : '')
+      + (d.specials ? Object.keys(SP_HOW).map((k) => `<div class="spc"><strong>★ ${esc(d.specials[k].name)}</strong> <em>(${SP_HOW[k]})</em> ${esc(d.specials[k].desc || '')}</div>`).join('') : '');
+    const card = document.querySelector('.showcase');
+    card.classList.remove('swap'); void card.offsetWidth; card.classList.add('swap');
+  }
+  const hero = { char: null, color: null };
+  (function heroLoop(now) {
+    requestAnimationFrame(heroLoop);
+    if (!hero.char || $('screen-lobby').hidden || document.hidden) return;
+    D.hero($('hero'), hero.char, hero.color, now);
+  })(0);
+
   let charsBuilt = false;
   let portraitColor = undefined;
   function renderLobby(g) {
@@ -144,29 +167,30 @@
     }
     for (const b of $('colors').querySelectorAll('[data-color]')) b.setAttribute('aria-checked', String((b.dataset.color || null) === myColor));
     if (!charsBuilt) {
-      $('chars').innerHTML = CHAR_IDS.map((id) => {
-        const d = S.CHARS[id];
-        return `<button type="button" class="char" data-char="${id}" aria-pressed="false">
-          <canvas data-portrait="${id}"></canvas><span class="cn">${esc(d.name)}</span>
-          <span class="cd">${esc(d.desc)}</span><span class="stats">${statBars(d)}</span>
-          ${d.moves.special ? `<span class="spc"><strong>⚡ ${esc(d.moves.special.name)}</strong> ${esc(d.moves.special.desc || '')} <em>(ricarica ${d.moves.special.cooldown} s)</em></span>` : ''}
-          ${d.specials ? Object.keys(SP_HOW).map((k) => `<span class="spc"><strong>★ ${esc(d.specials[k].name)}</strong> <em>(${SP_HOW[k]})</em> ${esc(d.specials[k].desc || '')}</span>`).join('') : ''}</button>`;
-      }).join('');
+      $('chars').innerHTML = CHAR_IDS.map((id) => `<button type="button" class="tile" data-char="${id}" role="radio" aria-checked="false" aria-label="${esc(S.CHARS[id].name)}">
+          <canvas data-icon="${id}"></canvas><span class="tn">${esc(S.CHARS[id].name)}</span><span class="picks"></span></button>`).join('')
+        + '<button type="button" class="tile rnd" data-random="1" aria-label="Lottatore a caso"><span class="q">?</span><span class="tn">Caso</span></button>';
       charsBuilt = true;
     }
-    // i ritratti dei personaggi mostrano il colore che ho scelto
+    // le icone mostrano il colore che ho scelto
     if (portraitColor !== myColor) {
       portraitColor = myColor;
-      for (const c of $('chars').querySelectorAll('[data-portrait]')) D.portrait(c, c.dataset.portrait, S.colorHex(myColor));
+      for (const c of $('chars').querySelectorAll('[data-icon]')) D.portrait(c, c.dataset.icon, S.colorHex(myColor), 1.9);
     }
     const mine = g.picks[R.you];
-    for (const b of $('chars').querySelectorAll('[data-char]')) b.setAttribute('aria-pressed', String(b.dataset.char === mine));
+    for (const b of $('chars').querySelectorAll('[data-char]')) b.setAttribute('aria-checked', String(b.dataset.char === mine));
+    renderShowcase(mine, myColor);
 
     const list = [
       ...R.members.map((m) => ({ id: m.id, name: m.name, char: g.picks[m.id] || 'gilda', me: m.id === R.you, host: m.id === R.hostId })),
       ...g.bots.map((b) => ({ ...b, bot: true })),
     ];
     $('roster-count').textContent = `${list.length}/${g.max}`;
+    // sulle icone, chi ha scelto quel lottatore (un pallino colorato con l'iniziale, come nei picchiaduro)
+    for (const b of $('chars').querySelectorAll('[data-char]')) {
+      b.querySelector('.picks').innerHTML = list.map((f, i) => (f.char === b.dataset.char
+        ? `<span class="pk${f.me ? ' me' : ''}" style="--c:${D.SLOT_COLORS[i % 4]}" title="${esc(f.name)}">${esc((f.name || '?').charAt(0).toUpperCase())}</span>` : '')).join('');
+    }
     $('roster').innerHTML = list.map((f) => `<li>
         <canvas data-mini="${f.char}" data-id="${esc(f.id)}"></canvas>
         <span class="nm">${esc(f.name)}${f.me ? ' <span class="muted small">(tu)</span>' : ''}${f.host ? ' 👑' : ''}</span>
@@ -199,7 +223,14 @@
 
   // come si fa partire ogni speciale a barre (scheda del lottatore)
   const SP_HOW = { light: 'Basico tenuto', heavy: 'Potenziato + giù tenuti', dodge: 'Schiva tenuta', special: 'Speciale tenuta', ultimate: 'suprema: 4 barre piene, I o pulsante SUPREMA' };
-  $('chars').addEventListener('click', (e) => { const b = e.target.closest('[data-char]'); if (b) run('pick', { char: b.dataset.char }); });
+  $('chars').addEventListener('click', (e) => {
+    if (e.target.closest('[data-random]')) {
+      const others = CHAR_IDS.filter((id) => id !== (R && R.game.picks[R.you]));
+      return run('pick', { char: others[Math.floor(Math.random() * others.length)] || CHAR_IDS[0] });
+    }
+    const b = e.target.closest('[data-char]');
+    if (b) run('pick', { char: b.dataset.char });
+  });
   $('colors').addEventListener('click', (e) => {
     const b = e.target.closest('[data-color]');
     if (b) run('color', { color: b.dataset.color || null });
