@@ -107,11 +107,12 @@
         <ul class="howto">
           <li>Ogni colpo aumenta la <strong>percentuale di danno</strong> dell'avversario: più è alta, più vola lontano.</li>
           <li>Buttalo fuori dallo schermo per togliergli una <strong>vita</strong>. Vince l'ultimo che resta.</li>
-          <li><strong>Pugno</strong> è veloce, <strong>Forte</strong> è lento ma lancia molto di più: <strong>tienilo premuto per caricarlo</strong> (fino a 2 secondi, doppio danno e lancio quasi doppio). Mentre carichi sei fermo: un colpo ricevuto annulla tutto, la schivata interrompe la carica. Dopo un colpo caricato resti fermo un po': più l'hai caricato, più dura la pausa. Tieni su o giù mentre colpisci per colpire verso l'alto o verso il basso.</li>
+          <li><strong>Basico</strong> è veloce, <strong>Potenziato</strong> è lento ma lancia molto di più: <strong>tienilo premuto per caricarlo</strong> (fino a 2 secondi, doppio danno e lancio quasi doppio). Mentre carichi sei fermo: un colpo ricevuto annulla tutto, la schivata interrompe la carica. Dopo un colpo caricato resti fermo un po': più l'hai caricato, più dura la pausa. Tieni su o giù mentre colpisci per colpire verso l'alto o verso il basso.</li>
           <li><strong>Speciale</strong>: ogni lottatore ha una mossa tutta sua (la trovi nella scheda qui sopra). Dopo averla usata deve ricaricarsi per qualche secondo.</li>
+          <li><strong>Speciali a barre</strong> (solo alcuni lottatori): muovendoti e colpendo riempi una barra per Basico, Potenziato, Schiva e Speciale. A barra piena, <strong>tieni premuto</strong> il pulsante per far partire la sua speciale (Potenziato: tienilo premuto insieme a giù). Con tutte e 4 le barre piene puoi lanciare la <strong>suprema</strong>.</li>
           <li>Hai un salto da terra e due in aria. Tieni giù sulle piattaforme sospese per scendere. <strong>Schiva</strong> ti rende intoccabile per un attimo.</li>
           <li><strong>Telefono</strong> (in orizzontale): joystick a sinistra, pulsanti a destra.</li>
-          <li><strong>Computer</strong>: A/D o frecce per muoverti, W/↑/spazio salto, S/↓ giù, J pugno, K forte (tieni premuto per caricare), U speciale, L o Maiusc schiva.</li>
+          <li><strong>Computer</strong>: A/D o frecce per muoverti, W/↑/spazio salto, S/↓ giù, J basico, K potenziato (tieni premuto per caricare), U speciale, L o Maiusc schiva, I suprema.</li>
         </ul>
       </details>
       <p id="room-error" class="error center" role="alert"></p>
@@ -131,13 +132,14 @@
     <div class="rotate" id="rotate-hint">↻ Gira il telefono in orizzontale</div>
     <div class="pad" id="pad">
       <button class="pbtn dodge" data-act="d">SCHIVA</button>
-      <button class="pbtn heavy" data-act="h">FORTE</button>
-      <button class="pbtn light" data-act="l">PUGNO</button>
+      <button class="pbtn heavy" data-act="h">POTENZIATO</button>
+      <button class="pbtn light" data-act="l">BASICO</button>
       <button class="pbtn jump" data-act="j">SALTA</button>
       <button class="pbtn special" data-act="s">SPECIALE</button>
+      <button class="pbtn ult" data-act="ul" hidden>SUPREMA</button>
     </div>
     <div class="sp-ind" id="sp-ind" hidden></div>
-    <div class="desk-help">A/D muovi · W o spazio salta · S giù · J pugno · K forte (tieni premuto per caricare) · U speciale · L schiva</div>
+    <div class="desk-help">A/D muovi · W o spazio salta · S giù · J basico · K potenziato (tieni premuto per caricare) · U speciale · L schiva · I suprema</div>
   </section>
 
   <div id="toast" class="toast" role="status" hidden></div>

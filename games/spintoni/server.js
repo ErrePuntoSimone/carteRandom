@@ -114,13 +114,18 @@ const manager = createRoomManager({
       g.results = null;
       g.matchNo += 1;
       const sim = g.sim;
+      let evBuf = []; // eventi dei passi non ancora inviati (si manda lo stato ogni S.SEND_EVERY passi)
       g.loop = setInterval(() => {
         if (manager.rooms.get(room.code) !== room || g.sim !== sim) { clearInterval(g.loop); return; }
         sim.step();
-        for (const [id, set] of g.sockets) {
-          if (!set.size) continue;
-          const msg = JSON.stringify(sim.snapshot(id));
-          for (const ws of set) ws.send(msg);
+        evBuf.push(...sim.events);
+        if (sim.tick % S.SEND_EVERY === 0 || sim.over) {
+          for (const [id, set] of g.sockets) {
+            if (!set.size) continue;
+            const msg = JSON.stringify(sim.snapshot(id, evBuf));
+            for (const ws of set) ws.send(msg);
+          }
+          evBuf = [];
         }
         if (sim.over) {
           g.results = sim.results();

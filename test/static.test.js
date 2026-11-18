@@ -58,3 +58,21 @@ test('percorsi non validi', async () => {
   assert.strictEqual((await get('/carte/manca.js')).status, 404);
   assert.notStrictEqual((await get('/..%2fserver.js')).status, 200);
 });
+
+test('file già scaricati: con l\'ETag il server risponde 304 senza corpo', async () => {
+  const first = await fetch(base + '/spintoni/sprites/pepe.png');
+  const etag = first.headers.get('etag');
+  assert.ok(etag, 'ETag presente');
+  await first.arrayBuffer();
+  const again = await fetch(base + '/spintoni/sprites/pepe.png', { headers: { 'If-None-Match': etag } });
+  assert.strictEqual(again.status, 304);
+  assert.strictEqual((await again.arrayBuffer()).byteLength, 0);
+});
+
+test('spintoni: i pulsanti si chiamano Basico e Potenziato', async () => {
+  const r = await get('/spintoni/');
+  assert.match(r.text, /BASICO/);
+  assert.match(r.text, /POTENZIATO/);
+  assert.match(r.text, /<button[^>]*data-act="ul"[^>]*hidden/);
+  assert.doesNotMatch(r.text, /PUGNO|FORTE/);
+});

@@ -105,8 +105,15 @@ un'isola galleggiante e tre piattaforme sospese. Lo scopo è buttare fuori dallo
 - **Colore dei dettagli:** nella sala d'attesa ognuno sceglie un colore (o i colori originali) che si applica a pochi
   dettagli del personaggio: polsini dei guantoni, strisce delle scarpe, fibbia, e la bandana di Pepe, la stella e il
   fermacoda di Gilda, la fascia sulla canottiera di Tonno, il mantello di Micio. I bot ne prendono uno a caso.
-- **Controlli:** sul telefono in orizzontale joystick a sinistra e pulsanti Salta, Pugno, Forte, Schiva a destra;
-  sul computer A/D o frecce, W/↑/spazio per saltare, S/↓ giù, J pugno, K forte, U speciale, L o Maiusc schiva.
+- **Speciali nascoste e suprema:** tutti i lottatori hanno una **barra** su ognuno dei
+  quattro pulsanti (Basico, Potenziato, Schiva, Speciale). Le barre si riempiono col carattere del lottatore (`meter`:
+  correre e colpire) e se ne vedono i segni sui pulsanti. **Tocco e tenuto:** un tocco fa la mossa di sempre; tenendo
+  premuto oltre 0,35 s (`PHYS.holdSpecial`) con la barra piena parte la speciale di quel pulsante e la barra si svuota
+  (il Potenziato tenuto vuole anche il giù). Con **tutte e quattro le barre piene** il tasto **suprema** (I sul computer)
+  lancia la suprema e le svuota tutte. I bot le usano: suprema appena possibile con un avversario entro 600 unità,
+  proiettili a distanza media (150-600), le altre speciali da vicino, tenendo premuto come un giocatore.
+- **Controlli:** sul telefono in orizzontale joystick a sinistra e pulsanti Salta, Basico, Potenziato, Schiva a destra;
+  sul computer A/D o frecce, W/↑/spazio per saltare, S/↓ giù, J Basico, K Potenziato, U speciale, L o Maiusc schiva, I suprema.
 - **Rete:** come Rissa, il server simula a 30 passi al secondo e decide i colpi; il telefono prevede la propria fisica
   con lo stesso codice (`public/spintoni/shared.js`) e la riallinea a quella del server.
 
@@ -127,7 +134,7 @@ dopo il suo **tempo di ricarica** (`cooldown`). Campi che il motore sa gestire i
 | `dmg`, `base`, `growth`, `boxes` | danno, lancio e zone di colpo (`side`, `up`, `down`; una sola = vale per tutte le direzioni) |
 | `chargeable` | si carica tenendo premuto (come il forte) |
 | `lunge` | passetto in avanti `{ speed, time }` |
-| `motion` | spinte durante la mossa `[{ from, to, vx, vy, edgeStop }]` (scatti, salite) |
+| `motion` | spinte durante la mossa `[{ from, to, vx, vy, edgeStop }]` (scatti, salite); nelle speciali nascoste `edgeStop` ferma al bordo dell'isola anche in aria e a fine scatto in aria si torna alla velocità normale |
 | `keepOnLand` | in aria non si interrompe atterrando |
 | `armor` | corazza `{ from, to }`: i colpi fanno danno ma non lanciano né interrompono |
 | `counter` | parata `{ from, to, dmg, base, growth, ang }`: chi colpisce in quel momento viene respinto |
@@ -135,11 +142,40 @@ dopo il suo **tempo di ricarica** (`cooldown`). Campi che il motore sa gestire i
 | `anim` | animazione dello sprite da usare (es. `heavy_up`) |
 | `recover` | i bot la usano per rientrare dal vuoto |
 
+**Speciali nascoste.** Oltre a `moves`, un personaggio può avere `specials` (`light`, `heavy`, `dodge`, `special`,
+`ultimate`, ognuna una mossa con i campi della tabella e in più i seguenti: servono **tutte e cinque**) e `meter: { move, hit }` (quanto la barra
+sale correndo e colpendo). Ogni speciale ha `charge`, i punti barra che servono (la suprema non ne ha: vuole tutte e
+quattro piene). Campi in più:
+
+| campo | effetto |
+|---|---|
+| `specials` | le cinque mosse nascoste, vedi sopra |
+| `meter` | `{ move, hit }`: carica della barra da movimento e da colpi dati |
+| `projectile` | proiettile (o lista di proiettili) `{ at, speed, ang, grav, life, box, dmg, base, growth, kbAng, dx, dy }` creato al tempo `at`; `pierce` attraversa tutti, `returns` a metà vita torna indietro e può colpire di nuovo, `debuff` e `noLaunch` come per le mosse; lancia verso dove vola |
+| `buff` | su di sé `{ at, dur, speed, jump, power, weight }`: moltiplicatori per `dur` secondi (un buff nuovo rinnova quello in corso, non si somma) |
+| `debuff` | su chi viene colpito `{ dur, speed, jump, power, weight }` (come il buff: rinnova, non si somma) |
+| `noLaunch` | colpisce (danno, stati) senza lanciare né interrompere |
+| `groundOnly` | la speciale parte solo da terra (tenuta in aria non succede nulla) |
+| `noDrift` | durante la mossa non ci si guida a destra e sinistra, neanche in aria |
+
+Kit di **Pepe**: *Pugno di vento* (Basico, proiettile piccolo e veloce), *Palla di fuoco* (Potenziato, proiettile lento
+e forte), *Turbo* (Schiva, per 4 s corre il 40% più veloce), *Polverone* (Speciale, nuvola che rallenta chi ci finisce
+dentro) e la suprema *Tempesta di fuoco* (cinque palle di fuoco a ventaglio più il Turbo).
+
+Kit di **Gilda** (barre metà correndo, metà colpendo): *Stella cadente* (stella ad arco), *Pugno stellare* (scatto
+corazzato), *Scudo di stelle* (per 5 s pesa di più), *Incantesimo* (chi le sta vicino picchia più piano) e la suprema
+*Pioggia di stelle* (cinque stelle ad arco e più potenza). Kit di **Micio** (barre soprattutto colpendo):
+*Fendente d'aria* (lama che attraversa tutti), *Scudo boomerang* (torna indietro e colpisce di nuovo), *Postura del
+cavaliere* (più potenza per 5 s), *Carica di cavalleria* (affondo lunghissimo con corazza) e la suprema *Mille fendenti*
+(cinque lame a ventaglio con corazza). Kit di **Tonno** (barre quasi solo colpendo): *Sputo d'acqua* (getto corto che
+rallenta), *Tuffo bomba* (salta e ricade schiacciando), *Furia* (più veloce e più forte per 4 s), *Onda* (onda bassa
+che spinge tutti) e la suprema *Maremoto* (due onde, una per lato, con corazza).
+
 Speciali attuali: **Pepe** *Turbine* (sale ruotando, ottima per rientrare), **Gilda** *Contrattacco* (para e risponde),
 **Micio** *Affondo* (scatto in avanti con la spada), **Tonno** *Carica del toro* (scatto con corazza).
 Per un nuovo personaggio: copia un file in `chars/`, aggiungi l'id a `index.json` e mettine gli sprite in `sprites/`
 (senza sprite si usa il disegno a codice). Prossimi passi previsti: combo a catena, meccaniche con codice proprio
-(agganci), proiettili e modalità allenamento con le zone di colpo visibili.
+(agganci) e modalità allenamento con le zone di colpo visibili.
 
 ### Mappa di Spintoni (PNG)
 

@@ -8,6 +8,20 @@ const KO_CREDIT = 8; // secondi in cui l'ultimo colpo vale come KO
 const r1 = (v) => Math.round(v * 10) / 10;
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const NEUTRAL = { mx: 0, up: false, down: false };
+const SNAP_DEFAULTS = S.SNAP_DEFAULTS;
+// numeri della fisica arrotondati al millesimo: abbastanza per la previsione, molti meno caratteri
+function roundPh(o) {
+  for (const k in o) if (typeof o[k] === 'number') o[k] = r3(o[k]);
+  if (o.att) { o.att.t = r3(o.att.t); o.att.c = r3(o.att.c || 0); }
+  if (o.buf) o.buf.t = r3(o.buf.t);
+  for (const s of o.sts) s.t = r3(s.t);
+  // per difetto: una barra a 3,9996 non deve arrivare al telefono come piena
+  for (const k of ['mt', 'ht']) if (o[k]) for (const s in o[k]) o[k][s] = Math.floor(o[k][s] * 1000) / 1000;
+  // campi vuoti non mandati: il telefono li rimette prima di riapplicare gli input (vedi app.js)
+  for (const k of ['mt', 'ht', 'spArm']) if (o[k] === null) delete o[k];
+  if (!o.sts.length) delete o.sts;
+  return o;
+}
 
 class Sim {
   constructor({ players, stocks = 3, duration = 240, countdown = 0, rng = Math.random }) {
@@ -19,6 +33,8 @@ class Sim {
     this.tick = 0;
     this.over = false;
     this.events = [];
+    this.shots = []; // proiettili in volo (solo il server li simula)
+    this.shotSeq = 0;
     this.fighters = new Map();
     this.outOrder = 0;
     players.forEach((p, i) => this.add(p, i));
@@ -34,7 +50,7 @@ class Sim {
       id, name, bot: !!bot, slot: i, dmg: 0, stocks: this.stocks, alive: true, respawnAt: 0, out: 0,
       kos: 0, falls: 0, dealt: 0, lastHitBy: null, lastHitAt: -99, hitBy: new Set(),
       queue: [], seq: 0, held: { ...NEUTRAL },
-      brain: bot ? { think: 0, inp: { ...NEUTRAL }, jumpT: 0, holdT: 0 } : null,
+      brain: bot ? { think: 0, inp: { ...NEUTRAL }, jumpT: 0, holdT: 0, hb: 0, hbT: 0 } : null,
     });
     this.fighters.set(id, f);
   }
@@ -54,6 +70,7 @@ class Sim {
     f.queue.push({
       s, mx: Math.max(-1, Math.min(1, Number(m.mx) || 0)), up: !!m.up, down: !!m.dn,
       j: !!m.j, l: !!m.l, h: !!m.h, sp: !!m.sp, hd: !!m.hd, d: !!m.d, dd: !!m.dd,
+      hb: Number.isInteger(Number(m.hb)) && m.hb >= 0 && m.hb <= 15 ? Number(m.hb) : 0, ul: !!m.ul,
     });
     if (f.queue.length > 10) f.queue.splice(0, f.queue.length - 10);
   }
@@ -88,7 +105,7 @@ class Sim {
         for (let k = 0; k < n; k++) {
           const inp = f.queue.shift();
           f.seq = inp.s;
-          f.held = { mx: inp.mx, up: inp.up, down: inp.down, hd: inp.hd };
+          f.held = { mx: inp.mx, up: inp.up, down: inp.down, hd: inp.hd, hb: inp.hb };
           S.stepFighter(f, inp, dt);
         }
       }
@@ -98,7 +115,8 @@ class Sim {
       }
     }
 
-    this.resolveHits();
+    this.spawnShots();
+    this.resolveHits(this.stepShots(dt));
 
     for (const f of this.fighters.values()) {
       if (f.alive && S.outOfBounds(f)) this.ko(f);
@@ -108,7 +126,7 @@ class Sim {
     if ((this.started >= 2 && left.length <= 1) || this.time >= this.duration) this.over = true;
   }
 
-  resolveHits() {
+  resolveHits(shotHits = []) {
     const hits = [];
     for (const a of this.fighters.values()) {
       if (!a.alive) continue;
@@ -129,17 +147,81 @@ class Sim {
       if (counter) this.counterHit(v, a, counter);
       else this.applyHit(a, v, att, { armor: !!armor });
     }
+    // proiettili: stessa regola, sullo stesso istante; la parata li distrugge senza risposta
+    const sPlan = shotHits.map(([s, v]) => [s, v, S.inWindow(v, 'counter'), S.inWindow(v, 'armor')]);
+    for (const [s, v, counter, armor] of sPlan) {
+      if (counter) { this.events.push({ t: 'counter', id: v.id, by: s.owner, x: r1(v.x), y: r1(v.y - 60) }); s.dead = true; continue; }
+      const o = this.fighters.get(s.owner); // anche se è KO o uscito: il colpo vale per lui
+      this.launch(o, v, { dmg: s.dmg, base: s.base, growth: s.growth, ang: s.kbAng, face: s.face, ty: s.ty, armor: !!armor, debuff: s.debuff, noLaunch: s.noLaunch });
+      if (!s.pierce) s.dead = true;
+    }
+    this.shots = this.shots.filter((s) => !s.dead);
+  }
+
+  // Un proiettile per voce di `projectile`, quando l'attacco supera `at` (una volta per attacco: f.att.shot).
+  spawnShots() {
+    for (const f of this.fighters.values()) {
+      if (!f.alive || !f.att) continue;
+      const pr = S.moveOf(f.char, f.att.ty).projectile;
+      if (!pr) continue;
+      const list = [].concat(pr);
+      const done = f.att.shot || (f.att.shot = []);
+      list.forEach((p, i) => {
+        if (done[i] || f.att.t < p.at) return;
+        done[i] = true;
+        const r = (p.ang * Math.PI) / 180;
+        const kind = `${f.char}:${f.att.ty.replace('sp:', '')}`;
+        const x = f.x + f.face * (p.dx || 0), y = f.y + (p.dy || 0);
+        const vx = Math.cos(r) * p.speed * f.face;
+        this.shots.push({
+          id: ++this.shotSeq, owner: f.id, kind, ty: f.att.ty, x, y,
+          vx, vy: Math.sin(r) * p.speed, grav: p.grav || 0, life: p.life,
+          // lancia verso dove vola (un proiettile all'indietro spinge all'indietro)
+          w: p.box.w, h: p.box.h, face: Math.abs(vx) > 1e-6 ? Math.sign(vx) : f.face, hit: new Set(), dmg: p.dmg, base: p.base, growth: p.growth,
+          kbAng: p.kbAng, pierce: !!(p.pierce || p.returns), debuff: p.debuff || null, noLaunch: !!p.noLaunch,
+          ret: p.returns ? p.life / 2 : 0, // a metà vita torna indietro e può colpire di nuovo
+        });
+        this.events.push({ t: 'shot', id: f.id, kind, x: r1(x), y: r1(y) });
+      });
+    }
+  }
+
+  // Muove i proiettili; restituisce i colpi [proiettile, vittima] da applicare insieme a quelli corpo a corpo.
+  stepShots(dt) {
+    const hits = [], m = S.STAGE.main, B = S.STAGE.blast;
+    for (const s of this.shots) {
+      s.vy += s.grav * dt;
+      s.x += s.vx * dt; s.y += s.vy * dt;
+      s.life -= dt;
+      if (s.ret && s.life <= s.ret) { s.ret = 0; s.vx = -s.vx; s.vy = -s.vy; s.face = -s.face; s.hit.clear(); }
+      if (s.life <= 0 || s.x < B.l || s.x > B.r || s.y < B.t || s.y > B.b
+        || (s.x > m.x && s.x < m.x + m.w && s.y > m.y && s.y < m.y + m.h)) { s.dead = true; continue; }
+      const box = { x: s.x - s.w / 2, y: s.y - s.h / 2, w: s.w, h: s.h };
+      for (const v of this.fighters.values()) {
+        if (v.id === s.owner || !v.alive || v.inv > 0 || s.hit.has(v.id)) continue;
+        if (!S.overlap(box, S.hurtbox(v))) continue;
+        s.hit.add(v.id);
+        hits.push([s, v]);
+        if (S.inWindow(v, 'counter') || !s.pierce) break; // un colpo solo: il resto lo decide resolveHits
+      }
+    }
+    return hits;
   }
 
   // Lancio: danno, forza (base + crescita con il danno), angolo; potenza di chi colpisce e peso di chi lo subisce.
-  launch(a, v, { dmg, base, growth, ang, face, ty, p = 0, armor = false }) {
-    const ca = S.CHARS[a.char], cv = S.CHARS[v.char];
-    const d = dmg * ca.power * (1 + p);
+  launch(a, v, { dmg, base, growth, ang, face, ty, p = 0, armor = false, debuff = null, noLaunch = false }) {
+    const ca = S.CHARS[a.char];
+    const d = dmg * S.statOf(a, 'power') * (1 + p);
+    const before = v.dmg;
     v.dmg = Math.min(999, v.dmg + d);
     a.dealt += d;
+    const pts = ((v.dmg - before) / S.PHYS.meterDmg) * ca.meter.hit; // barre dal danno realmente inflitto
+    S.addMeter(a, pts);
+    S.addMeter(v, ((v.dmg - before) / S.PHYS.meterDmg) * S.CHARS[v.char].meter.hit / 2); // chi riceve: metà, con il suo meter.hit
+    if (debuff) S.addStatus(v, 'd', debuff);
     v.lastHitBy = a.id; v.lastHitAt = this.time;
-    const kb = (((base + growth * v.dmg) * ca.power) / cv.weight) * (1 + 0.7 * p);
-    if (armor) {
+    const kb = (((base + growth * v.dmg) * S.statOf(a, 'power')) / S.statOf(v, 'weight')) * (1 + 0.7 * p);
+    if (armor || noLaunch) {
       // corazza: il danno resta, il lancio no (e la mossa continua)
       this.events.push({ t: 'hit', id: v.id, by: a.id, x: r1(v.x), y: r1(v.y - 50), ty, kb: 0, ch: 0, arm: 1, vx: 0, vy: 0 });
       return;
@@ -159,7 +241,7 @@ class Sim {
     const box = move.boxes[att.dir] || move.boxes.side;
     const p = att.p || 0; // carica del pugno forte (0..1): fino al doppio del danno e quasi al doppio del lancio
     const ang = att.dir === 'down' && att.air && box.airAng !== undefined ? box.airAng : box.ang;
-    this.launch(a, v, { dmg: move.dmg, base: move.base, growth: move.growth, ang, face: a.face, ty: att.ty, p, armor });
+    this.launch(a, v, { dmg: move.dmg, base: move.base, growth: move.growth, ang, face: a.face, ty: att.ty, p, armor, debuff: move.debuff, noLaunch: move.noLaunch });
   }
 
   // Parata riuscita: il colpo non arriva e chi para risponde subito.
@@ -194,7 +276,7 @@ class Sim {
       if (d > bestD) { bestD = d; best = sp; }
     }
     Object.assign(f, S.newFighter(best.x, 140, f.char), {
-      alive: true, dmg: 0, inv: RESPAWN_SHIELD, lastHitBy: null, attN: f.attN,
+      alive: true, dmg: 0, inv: RESPAWN_SHIELD, lastHitBy: null, attN: f.attN, mt: f.mt,
     });
     f.queue.length = 0;
     this.events.push({ t: 'spawn', id: f.id, x: r1(f.x), y: 140 });
@@ -218,6 +300,11 @@ class Sim {
       return inp;
     }
 
+    // pressione tenuta per una speciale (solo chi ha le barre): resta premuta finché non è passato holdSpecial
+    if (br.hbT > 0) {
+      br.hbT -= dt;
+      return { mx: 0, up: false, down: br.hb === 2, hb: br.hb };
+    }
     br.think -= dt;
     if (br.think > 0) { br.holdT = Math.max(0, br.holdT - dt); return { ...br.inp, j: false, l: false, h: false, sp: false, d: false, dd: false, hd: br.holdT > 0 }; }
     br.think = 0.07 + this.rng() * 0.08; // tempo di reazione
@@ -231,6 +318,29 @@ class Sim {
     if (!target) { br.inp = inp; return inp; }
 
     const dx = target.x - f.x, dy = target.y - f.y;
+    if (f.mt) { // speciali nascoste e suprema (il rng si usa solo qui, quindi gli altri bot non cambiano)
+      const dist = Math.hypot(dx, dy);
+      if (dist < 600 && S.SLOTS.every((k) => S.meterFull(f, k))) { // suprema subito
+        inp.ul = true;
+        br.inp = { mx: 0, up: false, down: false };
+        return inp;
+      }
+      const cs = S.CHARS[f.char].specials;
+      // proiettili fin dove arrivano (quelli ad arco non da vicino), le altre da vicino
+      const inRange = (k) => {
+        const p = [].concat(cs[k].projectile)[0];
+        return dist >= (p.grav ? 380 : 150) && dist <= Math.min(600, p.speed * p.life) && Math.abs(dy) < 120;
+      };
+      const ready = S.SLOTS.filter((k) => S.meterFull(f, k) && (cs[k].projectile ? inRange(k) : dist < 150));
+      if (ready.length && !(f.att && f.att.ty.startsWith('sp:')) && this.rng() < 0.35) {
+        const k = ready[Math.floor(this.rng() * ready.length)];
+        f.face = dx >= 0 ? 1 : -1;
+        br.hb = 1 << S.SLOTS.indexOf(k);
+        br.hbT = S.PHYS.holdSpecial + 2 * dt;
+        br.inp = { mx: 0, up: false, down: false };
+        return { mx: 0, up: false, down: k === 'heavy', hb: br.hb };
+      }
+    }
     const near = Math.abs(dx) < 100 && Math.abs(dy) < 80;
     if (!near) {
       inp.mx = Math.sign(dx);
@@ -262,7 +372,8 @@ class Sim {
   }
 
   // ---------- stato da inviare ----------
-  snapshot(viewerId) {
+  // ev: eventi da includere (il server ci mette quelli accumulati dall'ultimo invio)
+  snapshot(viewerId, ev = this.events) {
     const me = this.fighters.get(viewerId);
     const fs = [];
     for (const f of this.fighters.values()) {
@@ -272,13 +383,17 @@ class Sim {
         a: f.att ? { ty: f.att.ty, dir: f.att.dir, t: r3(f.att.t), air: f.att.air, c: r3(f.att.c || 0), rel: f.att.rel ? 1 : 0 } : null,
         hs: r3(f.hs), dg: r3(f.dg), inv: f.inv > 0,
       };
-      if (f.id === viewerId) base.ph = S.physState(f);
+      // per risparmiare banda i valori "a riposo" non si mandano (il client li rimette con SNAP_DEFAULTS)
+      for (const k in SNAP_DEFAULTS) if (base[k] === SNAP_DEFAULTS[k]) delete base[k];
+      if (f.sts.length) base.bf = (f.sts.some((s) => s.k === 'b') ? 'b' : '') + (f.sts.some((s) => s.k === 'd') ? 'd' : '');
+      if (f.id === viewerId) base.ph = roundPh(S.physState(f));
       fs.push(base);
     }
     return {
       t: 's', k: this.tick, ack: me ? me.seq : 0, cd: r1(this.cd),
       left: r1(Math.max(0, this.duration - this.time)),
-      f: fs, ev: this.events,
+      f: fs, ev,
+      ...(this.shots.length ? { p: this.shots.map((s) => [s.id, s.kind, r1(s.x), r1(s.y), s.face]) } : {}),
     };
   }
 

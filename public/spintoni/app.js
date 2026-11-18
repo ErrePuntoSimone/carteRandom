@@ -145,7 +145,8 @@
     $('hero-desc').textContent = d.desc;
     $('hero-stats').innerHTML = statBars(d);
     const sp = d.moves.special;
-    $('hero-sp').innerHTML = sp ? `<strong>⚡ ${esc(sp.name)}</strong> <em>ricarica ${sp.cooldown} s</em><br>${esc(sp.desc || '')}` : '';
+    $('hero-sp').innerHTML = (sp ? `<strong>⚡ ${esc(sp.name)}</strong> <em>ricarica ${sp.cooldown} s</em><br>${esc(sp.desc || '')}` : '')
+      + (d.specials ? Object.keys(SP_HOW).map((k) => `<div class="spc"><strong>★ ${esc(d.specials[k].name)}</strong> <em>(${SP_HOW[k]})</em> ${esc(d.specials[k].desc || '')}</div>`).join('') : '');
     const card = document.querySelector('.showcase');
     card.classList.remove('swap'); void card.offsetWidth; card.classList.add('swap');
   }
@@ -220,6 +221,8 @@
     }
   }
 
+  // come si fa partire ogni speciale a barre (scheda del lottatore)
+  const SP_HOW = { light: 'Basico tenuto', heavy: 'Potenziato + giù tenuti', dodge: 'Schiva tenuta', special: 'Speciale tenuta', ultimate: 'suprema: 4 barre piene, I o pulsante SUPREMA' };
   $('chars').addEventListener('click', (e) => {
     if (e.target.closest('[data-random]')) {
       const others = CHAR_IDS.filter((id) => id !== (R && R.game.picks[R.you]));
@@ -249,11 +252,13 @@
 
     let snaps = [], clockOffset = null, last = null;
     let seq = 0, pending = [], pred = null, prevPred = null, lastTickAt = 0, meAlive = false;
-    const press = { j: false, l: false, h: false, s: false, d: false, dd: false };
-    let heavyBtn = false;           // pulsante Forte tenuto premuto (touch / mouse): serve per caricare il colpo
+    const press = { j: false, l: false, h: false, s: false, d: false, dd: false, ul: false };
+    const btnHeld = new Set();      // pulsanti touch / mouse tenuti premuti (data-act): Potenziato carica, tutti per le speciali a barre
     const keys = new Set();
     let stick = null;               // joystick sinistro
-    let particles = [], rings = [], shake = 0, cardsKey = '';
+    let particles = [], rings = [], impacts = [], shake = 0, cardsKey = '';
+    const flashUntil = new Map(); // id -> fine del lampo di chi è appena stato colpito
+    const wasGround = new Map();  // id -> era a terra nel fotogramma prima (per la polvere)
 
     function resize() {
       dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -278,7 +283,7 @@
       clearInterval(cdTimer); cdTimer = setInterval(cdTick, 100);
       snaps = []; last = null; clockOffset = null;
       seq = 0; pending = []; pred = null; prevPred = null; meAlive = false;
-      particles = []; rings = []; shake = 0; cardsKey = ''; spKey = '-';
+      particles = []; rings = []; impacts = []; shake = 0; cardsKey = ''; spKey = '-'; flashUntil.clear(); wasGround.clear();
       resize();
       connect();
       sendTimer = setInterval(sendInput, S.TICK * 1000);
@@ -289,7 +294,7 @@
       if (ws) { ws.onclose = null; try { ws.close(); } catch { /* ignora */ } ws = null; }
       clearInterval(sendTimer); clearInterval(cdTimer);
       cancelAnimationFrame(raf);
-      stick = null; heavyBtn = false;
+      stick = null; btnHeld.clear();
       for (const b of document.querySelectorAll('.pbtn.on')) b.classList.remove('on');
     }
     function connect() {
@@ -308,7 +313,7 @@
       const now = performance.now();
       const off = now - m.k * S.TICK * 1000;
       clockOffset = clockOffset === null ? off : Math.min(off, clockOffset + 2);
-      const snap = { k: m.k, recv: now, f: new Map(m.f.map((f) => [f.id, f])), raw: m };
+      const snap = { k: m.k, recv: now, f: new Map(m.f.map((f) => [f.id, { ...S.SNAP_DEFAULTS, ...f }])), raw: m };
       snaps.push(snap);
       if (snaps.length > 40) snaps.shift();
       last = snap;
@@ -317,7 +322,8 @@
       const me = snap.f.get(R.you);
       meAlive = !!(me && me.al);
       if (me && me.al && me.ph) {
-        const base = JSON.parse(JSON.stringify(me.ph));
+        // il server non manda barre e stati vuoti: si rimettono prima di riapplicare gli input
+        const base = { mt: null, ht: null, spArm: null, sts: [], ...JSON.parse(JSON.stringify(me.ph)) };
         pending = pending.filter((i) => i.s > m.ack);
         if (m.cd > 0) pending = []; // conto alla rovescia: il server ignora gli input
         for (const i of pending) S.stepFighter(base, i.inp);
@@ -333,17 +339,27 @@
       updateHud(m);
     }
 
+    // stile degli effetti (colore e forma delle particelle) del personaggio di un lottatore
+    const fxOfId = (id) => { const f = last && last.f.get(id); return D.fxOf(f ? f.c : null); };
+
     function onEvent(ev) {
       if (ev.t === 'hit') {
         if (ev.arm) { burst(ev.x, ev.y, '#ffb74d', 10, 260); return; } // colpo assorbito dalla corazza
-        const heavy = ev.ty !== 'light';
+        const heavy = ev.ty !== 'light' && ev.ty !== 'sp:light';
         const ch = ev.ch || 0; // quanto era carico il colpo (0..1)
-        burst(ev.x, ev.y, heavy ? '#ffeb3b' : '#ffffff', heavy ? 18 + Math.round(30 * ch) : 9, heavy ? 520 + 300 * ch : 320);
+        const fx = fxOfId(ev.by); // le particelle sono del personaggio che colpisce
+        burst(ev.x, ev.y, heavy ? '#ffeb3b' : '#ffffff', heavy ? 8 + Math.round(12 * ch) : 4, heavy ? 520 + 300 * ch : 320);
+        burst(ev.x, ev.y, fx.color, heavy ? 12 + Math.round(18 * ch) : 6, heavy ? 560 + 300 * ch : 360, fx.shape);
+        burst(ev.x, ev.y, fx.glow, heavy ? 6 : 3, heavy ? 420 : 260, fx.shape);
+        impacts.push({ x: ev.x, y: ev.y, born: performance.now(), r: heavy ? 46 + 40 * ch : 28, color: fx.glow, life: heavy ? 170 : 110 });
+        flashUntil.set(ev.id, performance.now() + (heavy ? 140 : 90));
         rings.push({ x: ev.x, y: ev.y, born: performance.now(), r: heavy ? 70 + 70 * ch : 40 });
         shake = Math.max(shake, Math.min(16, ev.kb / 90));
         if ((ev.id === R.you || ev.by === R.you) && navigator.vibrate) navigator.vibrate(heavy ? 35 : 15);
       } else if (ev.t === 'ko') {
-        burst(ev.x, ev.y, '#ff5252', 40, 900);
+        const fx = fxOfId(ev.id);
+        burst(ev.x, ev.y, '#ff5252', 24, 900);
+        burst(ev.x, ev.y, fx.color, 24, 1000, fx.shape);
         rings.push({ x: ev.x, y: ev.y, born: performance.now(), r: 260, ko: true });
         shake = 22;
         const b = $('banner');
@@ -354,19 +370,33 @@
         onEvent.t = setTimeout(() => { b.hidden = true; }, 1300);
         if (navigator.vibrate && (ev.id === R.you || ev.by === R.you)) navigator.vibrate([60, 40, 90]);
       } else if (ev.t === 'counter') {
-        burst(ev.x, ev.y, '#80deea', 26, 600);
+        const fx = fxOfId(ev.id);
+        burst(ev.x, ev.y, '#80deea', 14, 600);
+        burst(ev.x, ev.y, fx.glow, 14, 650, fx.shape);
+        impacts.push({ x: ev.x, y: ev.y, born: performance.now(), r: 70, color: '#80deea', life: 200 });
         rings.push({ x: ev.x, y: ev.y, born: performance.now(), r: 110 });
         shake = Math.max(shake, 10);
+      } else if (ev.t === 'shot') {
+        const fx = D.fxOf(String(ev.kind).split(':')[0]);
+        burst(ev.x, ev.y, fx.glow, 8, 320, fx.shape);
       } else if (ev.t === 'spawn') {
         burst(ev.x, ev.y, '#81d4fa', 14, 300);
       }
     }
-    function burst(x, y, color, n, speed) {
+    function burst(x, y, color, n, speed, shape) {
       for (let i = 0; i < n; i++) {
         const a = Math.random() * Math.PI * 2, s = speed * (0.3 + Math.random() * 0.7);
-        particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.3 + Math.random() * 0.35, t: 0, color, size: 3 + Math.random() * 4 });
+        particles.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: 0.3 + Math.random() * 0.35, t: 0, color, size: 3 + Math.random() * 4, shape, g: shape === 'drop' ? 1600 : 0 });
       }
       if (particles.length > 500) particles.splice(0, particles.length - 500);
+    }
+
+    // nuvoletta di polvere ai piedi, verso i lati
+    function dust(x, y, n) {
+      for (let i = 0; i < n; i++) {
+        const side = i % 2 ? 1 : -1, s = 80 + Math.random() * 160;
+        particles.push({ x: x + side * 10, y: y - 4, vx: side * s, vy: -20 - Math.random() * 60, life: 0.3 + Math.random() * 0.25, t: 0, color: 'rgba(235, 225, 210, .8)', size: 4 + Math.random() * 4 });
+      }
     }
 
     // conto alla rovescia: la fine arriva sia dallo stato della stanza (SSE) sia dagli snapshot, così si vede anche
@@ -415,6 +445,7 @@
     }
 
     // ---------- input ----------
+    const HOLD = [['l', 'j', 'z'], ['h', 'k', 'x'], ['d', 'l', 'c', 'shift'], ['s', 'u', 'v']]; // [pulsante, tasti...] per bit
     function held() {
       let mx = 0, up = false, down = false;
       if (keys.has('a') || keys.has('arrowleft')) mx -= 1;
@@ -427,18 +458,21 @@
         if (dy < -28) up = true;
         if (dy > 28) down = true;
       }
-      // Forte tenuto premuto (tastiera o pulsante): carica il colpo, fino a 2 secondi
-      return { mx, up, down, hd: heavyBtn || keys.has('k') || keys.has('x') };
+      // tenuti premuti (bit 1 Basico, 2 Potenziato, 4 Schiva, 8 Speciale): servono per le speciali a barre
+      let hb = 0;
+      HOLD.forEach(([b, ...ks], i) => { if (btnHeld.has(b) || ks.some((k) => keys.has(k))) hb |= 1 << i; });
+      // Potenziato tenuto premuto (tastiera o pulsante): carica il colpo, fino a 2 secondi
+      return { mx, up, down, hd: !!(hb & 2), hb };
     }
 
     function sendInput() {
       if (!ws || ws.readyState !== 1) return;
       const h = held();
       // giù appena premuto: scende dalle piattaforme
-      const inp = { mx: h.mx, up: h.up, down: h.down, hd: h.hd, j: press.j, l: press.l, h: press.h, sp: press.s, d: press.d, dd: press.dd };
-      press.j = press.l = press.h = press.s = press.d = press.dd = false;
+      const inp = { mx: h.mx, up: h.up, down: h.down, hd: h.hd, hb: h.hb, ul: press.ul, j: press.j, l: press.l, h: press.h, sp: press.s, d: press.d, dd: press.dd };
+      press.j = press.l = press.h = press.s = press.d = press.dd = press.ul = false;
       seq += 1;
-      ws.send(JSON.stringify({ t: 'in', s: seq, mx: +inp.mx.toFixed(3), up: inp.up ? 1 : 0, dn: inp.down ? 1 : 0, j: inp.j ? 1 : 0, l: inp.l ? 1 : 0, h: inp.h ? 1 : 0, sp: inp.sp ? 1 : 0, hd: inp.hd ? 1 : 0, d: inp.d ? 1 : 0, dd: inp.dd ? 1 : 0 }));
+      ws.send(JSON.stringify({ t: 'in', s: seq, mx: +inp.mx.toFixed(3), up: inp.up ? 1 : 0, dn: inp.down ? 1 : 0, j: inp.j ? 1 : 0, l: inp.l ? 1 : 0, h: inp.h ? 1 : 0, sp: inp.sp ? 1 : 0, hd: inp.hd ? 1 : 0, d: inp.d ? 1 : 0, dd: inp.dd ? 1 : 0, ...(inp.hb ? { hb: inp.hb } : {}), ...(inp.ul ? { ul: 1 } : {}) }));
       if (pred && meAlive && !(last && last.raw.cd > 0)) {
         pending.push({ s: seq, inp });
         prevPred = { ...pred };
@@ -447,7 +481,7 @@
       lastTickAt = performance.now();
     }
 
-    const GAME_KEYS = ['w', 'a', 's', 'd', 'j', 'k', 'l', 'u', 'z', 'x', 'c', 'v', ' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
+    const GAME_KEYS = ['w', 'a', 's', 'd', 'j', 'k', 'l', 'u', 'i', 'z', 'x', 'c', 'v', ' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'];
     window.addEventListener('keydown', (e) => {
       if (!active) return;
       const k = e.key.toLowerCase();
@@ -459,11 +493,15 @@
         if (k === 'k' || k === 'x') press.h = true;
         if (k === 'u' || k === 'v') press.s = true;
         if (k === 'l' || k === 'c' || k === 'shift') press.d = true;
+        if (k === 'i') press.ul = true;
       }
       keys.add(k);
     });
     window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
-    window.addEventListener('blur', () => { keys.clear(); heavyBtn = false; });
+    // tasto del mouse rilasciato fuori dal pulsante (o finestra lasciata): nessun pulsante resta tenuto
+    const releaseBtns = () => { btnHeld.clear(); for (const b of document.querySelectorAll('.pbtn.on')) b.classList.remove('on'); };
+    window.addEventListener('blur', () => { keys.clear(); releaseBtns(); });
+    window.addEventListener('mouseup', releaseBtns);
 
     // joystick touch a sinistra, pulsanti a destra
     const game = $('screen-game');
@@ -490,8 +528,8 @@
     game.addEventListener('touchend', endTouch);
     game.addEventListener('touchcancel', endTouch);
     for (const b of document.querySelectorAll('.pbtn')) {
-      const on = (e) => { e.preventDefault(); e.stopPropagation(); press[b.dataset.act] = true; if (b.dataset.act === 'h') heavyBtn = true; b.classList.add('on'); if (navigator.vibrate) navigator.vibrate(8); };
-      const off = (e) => { e.preventDefault(); if (b.dataset.act === 'h') heavyBtn = false; b.classList.remove('on'); };
+      const on = (e) => { e.preventDefault(); e.stopPropagation(); press[b.dataset.act] = true; btnHeld.add(b.dataset.act); b.classList.add('on'); if (navigator.vibrate) navigator.vibrate(8); };
+      const off = (e) => { e.preventDefault(); btnHeld.delete(b.dataset.act); b.classList.remove('on'); };
       b.addEventListener('touchstart', on, { passive: false });
       b.addEventListener('touchend', off);
       b.addEventListener('touchcancel', off);
@@ -502,13 +540,25 @@
 
     // ---------- disegno ----------
     // ricarica della speciale: pulsante sul telefono e indicatore sul computer
+    // barre delle speciali (solo i personaggi che le hanno): anello sui pulsanti, pulsante suprema, barrette sul computer
+    const SLOT_KEY = { light: 'J', heavy: 'K+S', dodge: 'L', special: 'U' };
     let spKey = '';
     function updateSpecial() {
       const sp = pred && S.CHARS[pred.char] && S.CHARS[pred.char].moves.special;
+      const sps = pred && pred.mt && S.CHARS[pred.char] && S.CHARS[pred.char].specials;
+      const fr = sps ? S.SLOTS.map((k) => Math.min(1, pred.mt[k] / sps[k].charge)) : null;
+      const ult = !!fr && fr.every((v) => v >= 1);
       const cd = sp ? pred.spCd || 0 : 0;
-      const key = sp ? `${sp.name}:${cd > 0 ? Math.ceil(cd * 10) : 'ok'}` : '';
+      const key = (sp ? `${sp.name}:${cd > 0 ? Math.ceil(cd * 10) : 'ok'}` : '') + (fr ? fr.map((v) => Math.floor(v * 20)).join(',') : '');
       if (key === spKey) return;
       spKey = key;
+      S.SLOTS.forEach((k, i) => {
+        const b = document.querySelector('.pbtn.' + k);
+        b.classList.toggle('mt', !!fr);
+        b.classList.toggle('full', !!fr && fr[i] >= 1);
+        if (fr) b.style.setProperty('--m', fr[i].toFixed(3));
+      });
+      document.querySelector('.pbtn.ult').hidden = !ult;
       const btn = document.querySelector('.pbtn.special');
       const ind = $('sp-ind');
       if (!sp) { ind.hidden = true; return; }
@@ -518,7 +568,9 @@
       btn.dataset.cd = cd > 0 ? (cd >= 1 ? String(Math.ceil(cd)) : cd.toFixed(1)) : '';
       ind.hidden = false;
       ind.classList.toggle('ready', cd <= 0);
-      ind.textContent = cd > 0 ? `⚡ ${sp.name}: ${cd.toFixed(1)} s` : `⚡ ${sp.name} pronta (U)`;
+      ind.innerHTML = esc(cd > 0 ? `⚡ ${sp.name}: ${cd.toFixed(1)} s` : `⚡ ${sp.name} pronta (U)`)
+        + (fr ? fr.map((v, i) => `<span class="mb${v >= 1 ? ' full' : ''}" style="--m:${v.toFixed(2)}">${SLOT_KEY[S.SLOTS[i]]}</span>`).join('') : '')
+        + (ult ? '<span class="mb ul">I · SUPREMA!</span>' : '');
     }
 
     function displayedMe() {
@@ -527,10 +579,10 @@
       return { ...pred, x: prevPred.x + (pred.x - prevPred.x) * t, y: prevPred.y + (pred.y - prevPred.y) * t };
     }
 
-    // gli altri: interpolati tra due snapshot, ~2 passi nel passato
+    // gli altri: interpolati tra due snapshot, un invio e mezzo nel passato (margine per i ritardi di rete)
     function others() {
-      if (!snaps.length) return [];
-      const renderK = (performance.now() - clockOffset) / (S.TICK * 1000) - 2;
+      if (!snaps.length) return { list: [], shots: [] };
+      const renderK = (performance.now() - clockOffset) / (S.TICK * 1000) - S.SEND_EVERY * 1.5;
       let a = snaps[0], b = snaps[snaps.length - 1];
       for (let i = snaps.length - 1; i > 0; i--) {
         if (snaps[i - 1].k <= renderK) { a = snaps[i - 1]; b = snaps[i]; break; }
@@ -544,7 +596,14 @@
         if (f0 && f0.al === f1.al && Math.hypot(f1.x - f0.x, f1.y - f0.y) < 300) out.push({ ...f1, x: f0.x + (f1.x - f0.x) * t, y: f0.y + (f1.y - f0.y) * t });
         else out.push(f1);
       }
-      return out;
+      // proiettili: interpolati come gli avversari; quelli appena nati (solo nel secondo snapshot) dove sono in quello
+      const pa = new Map((a.raw.p || []).map((p) => [p[0], p]));
+      const shots = [];
+      for (const [id, kind, x, y, face] of b.raw.p || []) {
+        const p0 = pa.get(id);
+        shots.push(p0 ? [id, kind, p0[2] + (x - p0[2]) * t, p0[3] + (y - p0[3]) * t, face] : [id, kind, x, y, face]);
+      }
+      return { list: out, shots };
     }
 
     let lastFrame = 0;
@@ -569,7 +628,7 @@
       if (!scene.mapReady && D.mapReady()) scene = D.makeScene(); // le immagini della mappa sono arrivate dopo
       ctx.drawImage(scene.canvas, scene.ox, scene.oy);
 
-      const list = others();
+      const { list, shots } = others();
       const meNow = displayedMe();
       for (const f of list) {
         if (!f.al) continue;
@@ -579,9 +638,16 @@
         if (st.hs > 0.1 && Math.hypot(st.vx, st.vy) > 700) {
           particles.push({ x: st.x, y: st.y - 44, vx: 0, vy: 0, life: 0.35, t: 0, color: 'rgba(255,255,255,.7)', size: 9 });
         }
-        D.fighter(ctx, st.x, st.y, st, f.sl, now, { name: f.id === R.you ? 'Tu' : nameOf(f.id), color: colorOf(f.id) });
+        // polvere quando si atterra o si salta da terra
+        const wg = wasGround.get(f.id);
+        if (wg !== undefined && wg !== !!st.g) dust(st.x, st.y, st.g ? 8 : 5);
+        wasGround.set(f.id, !!st.g);
+        const fl = Math.max(0, ((flashUntil.get(f.id) || 0) - now) / 140);
+        if (st.bf) D.statusAura(ctx, st.x, st.y, st.bf, now, f.c);
+        D.fighter(ctx, st.x, st.y, st, f.sl, now, { name: f.id === R.you ? 'Tu' : nameOf(f.id), color: colorOf(f.id), flash: fl });
       }
 
+      for (const p of shots) D.projectile(ctx, p[1], p[2], p[3], p[4], now);
       for (const r of rings) {
         const t = (now - r.born) / (r.ko ? 600 : 260);
         if (t > 1) continue;
@@ -590,11 +656,12 @@
         ctx.beginPath(); ctx.arc(r.x, r.y, r.r * (0.3 + t), 0, Math.PI * 2); ctx.stroke();
       }
       rings = rings.filter((r) => now - r.born < 600);
+      for (const im of impacts) D.impact(ctx, im.x, im.y, im.r, Math.min(1, (now - im.born) / im.life), im.color);
+      impacts = impacts.filter((im) => now - im.born < im.life);
       for (const p of particles) {
-        p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.88; p.vy *= 0.88;
+        p.t += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.88; p.vy *= 0.88; p.vy += (p.g || 0) * dt;
         ctx.globalAlpha = Math.max(0, 1 - p.t / p.life);
-        ctx.fillStyle = p.color;
-        ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (1 - p.t / p.life * 0.5), 0, Math.PI * 2); ctx.fill();
+        D.particle(ctx, p, p.t / p.life);
       }
       ctx.globalAlpha = 1;
       particles = particles.filter((p) => p.t < p.life);
